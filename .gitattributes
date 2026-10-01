@@ -1,0 +1,6 @@
+* text=auto
+*.bat text eol=crlf
+*.ttf binary
+*.ico binary
+*.bcmap binary
+*.pfb binary

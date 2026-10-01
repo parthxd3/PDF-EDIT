@@ -1,0 +1,7 @@
+# build output and local tool settings - not part of the source
+dist/
+node_modules/
+.claude/
+*.log
+Thumbs.db
+desktop.ini
