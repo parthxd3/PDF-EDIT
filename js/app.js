@@ -77,6 +77,7 @@ const ICONS = {
   al_t: 'M3 4h18M7 8h4v10H7zM14 8h4v6h-4z', al_m: 'M3 12h18M7 6h4v12H7zM14 8h4v8h-4z', al_b: 'M3 20h18M7 6h4v10H7zM14 10h4v6h-4z',
   dist_h: 'M4 4v16M20 4v16M9 8h6v8H9z', dist_v: 'M4 4h16M4 20h16M8 9h8v6H8z', brush: 'M4 20c3 0 4-2 4-4l8-9 3 3-9 8c-2 0-3 1-6 2zM14 5l5 5',
   selall: 'M4 4h4M4 4v4M20 4h-4M20 4v4M4 20h4M4 20v-4M20 20h-4M20 20v-4M9 12l2 2 4-4', compress: 'M12 3v6M9 6l3 3 3-3M12 21v-6M9 18l3-3 3 3M4 12h16', minus: 'M5 12h14',
+  bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0', bolt: 'M13 3L5 13h6l-1 8 8-10h-6z', sun: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5',
   cut: 'M6 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM6 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM8 9l12 8M8 15L20 7',
 };
 const HINTS = {
@@ -106,17 +107,34 @@ const S = {
   sources: [], pages: [], assets: {}, zoom: 1, tool: 'select', sel: null, cur: 0, srcVer: 0,
   undo: [], redo: [], fileName: 'document.pdf', dirty: false, meta: {}, editing: null, clip: null,
   style: { color: '#111111', fill: 'none', width: 2, dash: 'solid', rx: 0, size: 16, font: 'Helvetica', bold: false, italic: false, underline: false, strike: false, align: 'left', lh: 1.2, opacity: 1 },
-  para: false, styleClip: null, ctxPt: null,
+  para: false, styleClip: null, ctxPt: null, notes: [], unread: 0,
   find: { q: '', hits: [], cur: -1 },
 };
 const PE = new Map(), visible = new Set();
 let io = null, tio = null;
 
 /* ───────── helpers ───────── */
-function toast(msg, err) {
-  const t = document.createElement('div'); t.className = 'toast' + (err ? ' err' : ''); t.textContent = msg;
-  $('#toasts').appendChild(t); setTimeout(() => t.remove(), err ? 5000 : 2800);
+const NOTE_ICON = { success: 'check', error: 'x', warn: 'info', info: 'info' };
+const SUCCESS_RE = /saved|added|copied|restored|merged|replaced|compressed|removed|resized|deleted|picked up|converted|protected|inserted|extracted|unlocked/i;
+function toast(msg, kind) { // kind: true or 'error' | 'success' | 'warn' | 'info'; left out, it is guessed from the wording
+  const type = kind === true ? 'error' : typeof kind === 'string' ? kind : SUCCESS_RE.test(msg) ? 'success' : 'info';
+  S.notes.unshift({ msg, type, t: Date.now() }); if (S.notes.length > 40) S.notes.length = 40;
+  if (!$('#mNotes').classList.contains('open')) { S.unread++; updateBell(true); }
+  const host = $('#toasts'); if (dlg.open && host.parentNode !== dlg) dlg.appendChild(host); // a modal dialog covers everything outside itself
+  const t = document.createElement('div'); t.className = 'toast t-' + type;
+  t.innerHTML = `<i data-icon="${NOTE_ICON[type]}"></i><div class="tmsg"></div><button class="tx" title="Dismiss">&times;</button><div class="tbar"></div>`;
+  $('.tmsg', t).textContent = msg; icons(t); host.appendChild(t);
+  while (host.children.length > 4) host.firstChild.remove();
+  const life = type === 'error' || type === 'warn' ? 6500 : 3600; $('.tbar', t).style.animationDuration = life + 'ms';
+  const close = () => { if (t.classList.contains('out')) return; t.classList.add('out'); setTimeout(() => t.remove(), 300); };
+  let timer = setTimeout(close, life);
+  t.onmouseenter = () => clearTimeout(timer); t.onmouseleave = () => { timer = setTimeout(close, 1500); }; t.onclick = close; // hovering keeps it on screen
 }
+function updateBell(ring) {
+  const b = $('#bBell'), n = $('.badge', b); n.hidden = !S.unread; n.textContent = S.unread > 9 ? '9+' : S.unread;
+  if (ring) { b.classList.remove('ringing'); void b.offsetWidth; b.classList.add('ringing'); }
+}
+function flash(el, cls) { if (!el) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); } // replay a one-shot CSS animation
 async function busy(fn, txt = 'Working…') {
   $('#busyTxt').textContent = txt; $('#busy').hidden = false;
   try { return await fn(); } catch (e) { console.error(e); toast(e.message || String(e), true); }
@@ -124,10 +142,11 @@ async function busy(fn, txt = 'Working…') {
 }
 function dialog(title, html, { ok = 'OK', onOpen, onClose, wide, cancel = true } = {}) {
   return new Promise(res => {
+    document.body.appendChild($('#toasts')); // (it may have been parked inside the previous dialog)
     dlg.className = wide ? 'wide' : '';
     dlg.innerHTML = `<form method="dialog"><h3>${title}</h3><div class="dbody">${html}</div><div class="dfoot"><button value="ok" class="btn primary">${ok}</button>${cancel ? '<button value="cancel" class="btn" formnovalidate>Cancel</button>' : ''}</div></form>`;
     if (onOpen) onOpen(dlg);
-    dlg.onclose = () => { const r = dlg.returnValue === 'ok' ? Object.fromEntries(new FormData(dlg.firstChild)) : null; if (onClose) onClose(r); res(r); };
+    dlg.onclose = () => { const r = dlg.returnValue === 'ok' ? Object.fromEntries(new FormData(dlg.firstChild)) : null; document.body.appendChild($('#toasts')); if (onClose) onClose(r); res(r); };
     dlg.returnValue = ''; dlg.showModal();
   });
 }
@@ -851,7 +870,7 @@ function setTool(t) {
   $$('button[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
   const pane = ($(`button[data-tool="${t}"]`) || document.body).closest('.pane'); if (pane && !pane.classList.contains('active')) setTab(pane.dataset.pane); // show the tab that holds this tool
   if (t !== 'select') select(null);
-  $('#hint').textContent = HINTS[t] || ''; refreshTI(); syncControls();
+  $('#hint').textContent = HINTS[t] || ''; flash($('#hint'), 'swap'); refreshTI(); syncControls();
 }
 function applyProp(o, k, v) {
   if (k === 'color') { if (o.type === 'image') return; if (o.color === 'none' && o.fill && o.fill !== 'none') o.fill = v; else o.color = v; }
@@ -1452,7 +1471,7 @@ async function save() {
   await busy(async () => {
     const bytes = await buildPdf(S.pages);
     download(new Blob([bytes], { type: 'application/pdf' }), /-edited$/.test(baseName()) || S.sources.length === 0 ? S.fileName : baseName() + '-edited.pdf');
-    S.dirty = false; updateUI(); toast('PDF saved to your downloads');
+    S.dirty = false; updateUI(); flash($('#topbar [data-act=save]'), 'flash'); toast('PDF saved to your downloads');
   }, 'Building PDF…');
 }
 async function printDoc() {
@@ -1494,7 +1513,7 @@ function updateUI() {
   const cur = S.pages[S.cur];
   $$('.thumb', thumbs).forEach(t => { const on = cur && t.dataset.id === cur.id; if (on && !t.classList.contains('active')) t.scrollIntoView({ block: 'nearest' }); t.classList.toggle('active', !!on); });
 }
-const NO_DOC = new Set(['merge', 'mergedlg', 'ed_cut', 'ed_copy', 'ed_paste', 'ed_selall', 'ed_done', 'open', 'newdoc', 'theme', 'about', 'shortcuts', 'sidebar', 'restore', 'scan', 'docx2pdf']);
+const NO_DOC = new Set(['palette', 'accent', 'notesclear', 'merge', 'mergedlg', 'ed_cut', 'ed_copy', 'ed_paste', 'ed_selall', 'ed_done', 'open', 'newdoc', 'theme', 'about', 'shortcuts', 'sidebar', 'restore', 'scan', 'docx2pdf']);
 const ACT = {
   open: () => $('#fOpen').click(), save, print: printDoc, undo, redo, newdoc: newDoc, restore: restoreSession,
   zoomin: () => setZoom(S.zoom * 1.2), zoomout: () => setZoom(S.zoom / 1.2), zoomreset: () => setZoom(1), fit: () => setZoom(fitZoom()), fitpage: () => setZoom(fitZoom(true)),
@@ -1640,5 +1659,5 @@ window.XD3 = { S, PE, ACT, NO_DOC, HINTS, A4, CSS_UNITS, LH, BASE, viewer, $, $$
   pushUndo, snap, resetDoc, scheduleSave, buildPages, layout, drawObjs, drawSel, select, selObjs, selOne, setTool, syncControls, updateUI, goToPage, fitZoom, setZoom,
   bbox, center, rotP, shiftObj, isLine, textLines, measure, baseOff, cssFont, rdims, baseName, parseRange, textObj, placeObj, insertImage, addAsset, readImage, imagePage,
   getPdfPage, addSource, loadSource, openFiles, isPdf, isDocx, getText, getBlocks, getImages, visibleText, covered, fontStyle, convertRegion, renderPageImage, buildPdf, pageOp, movePage,
-  rotatePage, dupPage, deletePage, pageNumDlg, runFind, convertTextItem, drawTI, showCtx, mi, pageSub, ensureFont, BUNDLED, FONTS, commitEdit, viewCenter };
+  rotatePage, dupPage, deletePage, pageNumDlg, runFind, convertTextItem, drawTI, showCtx, mi, pageSub, ensureFont, BUNDLED, FONTS, commitEdit, viewCenter, updateBell, flash };
 })();

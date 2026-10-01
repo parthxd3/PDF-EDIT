@@ -37,10 +37,11 @@
   </nav>
   <div class="spacer"></div>
   <span id="fileName"></span>
+  <button class="btn cmdk" data-act="palette" title="Search every command (Ctrl+K)"><i data-icon="bolt"></i><span>Search commands</span><kbd>Ctrl K</kbd></button>
   <button class="btn ico" data-act="find" title="Find (Ctrl+F)"><i data-icon="search"></i></button>
+  <button class="btn ico" id="bBell" data-menu="mNotes" title="Notifications"><i data-icon="bell"></i><b class="badge" hidden></b></button>
   <button class="btn ico" data-act="sidebar" title="Toggle page panel"><i data-icon="panel"></i></button>
-  <button class="btn ico" data-act="theme" title="Toggle theme"><i data-icon="moon"></i></button>
-  <button class="btn ico" data-menu="mMore" title="More"><i data-icon="more"></i></button>
+  <button class="btn ico" data-menu="mMore" title="More: appearance, properties, help"><i data-icon="more"></i></button>
 </header>
 
 <div id="toolbar">
@@ -253,7 +254,20 @@
 
 <div class="menu fx" id="ctx"></div>
 <div class="menu fx" id="mFonts"></div>
+<div class="menu fx" id="mNotes"></div>
 <div class="menu fx" id="mMore">
+  <div class="mhead">Appearance</div>
+  <button data-act="theme" title="Switch between dark and light"><i data-icon="moon"></i><span>Dark / light theme</span></button>
+  <div class="swatches">
+    <button data-act="accent" data-v="violet" title="Violet accent" style="--sw:#7c5cff;background:#7c5cff"></button>
+    <button data-act="accent" data-v="ocean" title="Ocean accent" style="--sw:#3b82f6;background:#3b82f6"></button>
+    <button data-act="accent" data-v="emerald" title="Emerald accent" style="--sw:#10b981;background:#10b981"></button>
+    <button data-act="accent" data-v="sunset" title="Sunset accent" style="--sw:#f97316;background:#f97316"></button>
+    <button data-act="accent" data-v="rose" title="Rose accent" style="--sw:#ec4899;background:#ec4899"></button>
+    <button data-act="accent" data-v="gold" title="Gold accent" style="--sw:#d9a014;background:#d9a014"></button>
+  </div>
+  <hr>
+  <button data-act="palette" title="Search every command (Ctrl+K)"><i data-icon="bolt"></i><span>Search commands</span><kbd>Ctrl+K</kbd></button>
   <button data-act="newdoc"><i data-icon="pages"></i>New blank document</button>
   <button data-act="props"><i data-icon="info"></i>Document properties…</button>
   <button data-act="clearpage" class="danger"><i data-icon="trash"></i>Remove all edits on page</button>
@@ -292,7 +306,8 @@
 
 <dialog id="dlg"></dialog>
 <div id="toasts"></div>
-<div id="busy" hidden><div class="spin"></div><span id="busyTxt">Working…</span></div>
+<div id="busy" hidden><div class="busycard"><div class="spin"></div><span id="busyTxt">Working…</span></div></div>
+<div id="palette" hidden><div class="pbox"><input id="palInput" type="text" placeholder="Type a command…  e.g. merge, rotate, password" autocomplete="off" spellcheck="false"><div class="plist" id="palList"></div><div class="pfoot"><span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>Enter</kbd> run</span><span><kbd>Esc</kbd> close</span></div></div></div>
 
 <input type="file" id="fOpen" accept="application/pdf,image/*,.docx" multiple hidden>
 <input type="file" id="fMerge" accept="application/pdf,image/*,.docx" multiple hidden>
@@ -309,5 +324,6 @@
 <script src="js/convert.js"></script>
 <script src="js/organize.js"></script>
 <script src="js/secure.js"></script>
+<script src="js/ui.js"></script>
 </body>
 </html>
