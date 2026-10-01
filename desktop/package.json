@@ -1,0 +1,9 @@
+{
+  "name": "xd3-pdf-editor",
+  "productName": "XD3 PDF Editor",
+  "version": "1.0.0",
+  "description": "Free offline PDF editor by XD3Labs / XDCybertech Pvt Ltd",
+  "author": "XDCybertech Pvt Ltd",
+  "main": "main.js",
+  "private": true
+}
