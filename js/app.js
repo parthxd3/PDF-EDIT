@@ -750,6 +750,7 @@ const ocrOf = (p, force) => window.XD3.ocrItems ? window.XD3.ocrItems(p, force) 
 let tiSeq = 0;
 async function drawTI(p) {
   const pe = PE.get(p.id); if (!pe) return; const tool = S.tool, para = S.para, tok = pe.tiTok = ++tiSeq;
+  pe.g.insertBefore(pe.gTI, tool === 'edittext' ? pe.gUI : pe.gObjs); // text outlines sit above placed pictures (an opened image, a scan), so text inside them can be seen and clicked
   if (tool !== 'edittext' && tool !== 'editobj') { pe.gTI.textContent = ''; pe.items = null; return; }
   const stale = () => S.tool !== tool || S.para !== para || pe.tiTok !== tok || PE.get(p.id) !== pe;
   if (tool === 'editobj') {
