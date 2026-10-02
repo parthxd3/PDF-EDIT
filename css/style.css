@@ -239,6 +239,11 @@ body[data-mode="text"] .overlay, body[data-mode="note"] .overlay { cursor: text;
 body[data-mode="edittext"] .overlay { cursor: default; touch-action: auto !important; }
 .ti { fill: transparent; stroke: rgba(var(--acc-rgb), .6); stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; cursor: text; transition: fill .15s; animation: fadeIn .3s; }
 .ti.img { stroke: rgba(var(--acc2-rgb), .8); cursor: pointer; }
+.ti.ocr { stroke: rgba(var(--acc2-rgb), .85); }
+.ti.ocr:hover { fill: rgba(var(--acc2-rgb), .2); stroke: rgb(var(--acc2-rgb)); }
+.ocrbadge { position: absolute; left: 10px; top: 10px; z-index: 3; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: rgba(17, 20, 28, .86); color: #fff; font: 600 12px/1 system-ui, sans-serif; box-shadow: 0 4px 14px rgba(0, 0, 0, .3); pointer-events: none; animation: fadeIn .25s; }
+.ocrbadge i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .35); border-top-color: #fff; animation: ocrspin .8s linear infinite; }
+@keyframes ocrspin { to { transform: rotate(360deg); } }
 .ti:hover { fill: rgba(var(--acc-rgb), .18); stroke: var(--acc); }
 .hit { fill: #fde047; opacity: .45; mix-blend-mode: multiply; }
 .hit.cur { fill: #fb923c; opacity: .65; animation: pulse 1s ease 2; }

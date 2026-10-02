@@ -32,7 +32,7 @@ async function pageContent(p) { // visible text lines (with style) + images, in 
   const orig = lines.filter(l => l.src === 'orig'), boxes = p.src >= 0 ? (await X.getImages(p)).filter(b => !X.covered(p, b)) : [];
   if (p.src >= 0 && (orig.length || boxes.length)) {
     const canvas = await X.renderPageImage({ ...p, rot: 0, objs: [] }, K), ctx = canvas.getContext('2d', { willReadFrequently: true }); // rendering also loads the fonts
-    for (const l of orig) { const fs = await X.fontStyle(p, l.fontName); l.bold = fs.bold; l.italic = fs.italic; if (fs.family) l.font = fs.family; l.color = inkColor(ctx, K, l); }
+    for (const l of orig) { const fs = await X.fontStyle(p, l.fontName); l.bold = fs.bold; l.italic = fs.italic; if (fs.family || fs.real) l.font = fs.family || fs.real; l.color = inkColor(ctx, K, l); }
     for (const b of boxes) {
       const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(b.w * K)); c.height = Math.max(1, Math.round(b.h * K));
       c.getContext('2d').drawImage(canvas, Math.round(b.x * K), Math.round(b.y * K), c.width, c.height, 0, 0, c.width, c.height);
@@ -46,7 +46,7 @@ async function pageContent(p) { // visible text lines (with style) + images, in 
 /* ───────── PDF → DOCX ───────── */
 const FAM = { Helvetica: 'Arial', Times: 'Times New Roman', Courier: 'Courier New' };
 function runXml(l, text) {
-  const f = FAM[l.font] || (X.BUNDLED[l.font] ? l.font : 'Arial'), col = l.color && l.color !== '#000000' ? `<w:color w:val="${l.color.slice(1).toUpperCase()}"/>` : '', sz = Math.max(2, Math.round(l.size * 2));
+  const f = FAM[l.font] || X.esc(X.fontLabel(l.font || '').replace(/ (Bold|Italic)\b/g, '')) || 'Arial', col = l.color && l.color !== '#000000' ? `<w:color w:val="${l.color.slice(1).toUpperCase()}"/>` : '', sz = Math.max(2, Math.round(l.size * 2));
   const rpr = `<w:rPr><w:rFonts w:ascii="${f}" w:hAnsi="${f}" w:cs="${f}"/>${l.bold ? '<w:b/>' : ''}${l.italic ? '<w:i/>' : ''}${l.strike ? '<w:strike/>' : ''}${col}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>${l.underline ? '<w:u w:val="single"/>' : ''}</w:rPr>`;
   return `<w:r>${rpr}<w:t xml:space="preserve">${xesc(text)}</w:t></w:r>`;
 }

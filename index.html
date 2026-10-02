@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <!-- Nothing is ever sent anywhere: the page may only load and talk to its own bundled files. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:; worker-src 'self' blob:; frame-src blob:; media-src 'self' blob: mediastream:; object-src 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' blob: 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:; worker-src 'self' blob:; frame-src blob:; media-src 'self' blob: mediastream:; object-src 'none'; base-uri 'none'">
 <title>XD3 PDF Editor — Free PDF Editor by XD3Labs</title>
 <meta name="description" content="Free, fast, private, offline PDF editor by XD3Labs / XDCybertech Pvt Ltd. Edit text and objects, scan, convert Word, compress, protect, annotate, sign, merge and split PDFs entirely on your device.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236d5efc'/%3E%3Cpath d='M9 9l14 14M23 9L9 23' stroke='%23fff' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E">
@@ -126,6 +126,8 @@
 
   <div id="props" data-ctx="shape">
     <button class="tgl wide for-edittext" id="pPara" title="Paragraph mode — edit whole paragraphs instead of single lines"><b>¶</b><span>Paragraphs</span></button>
+    <button class="tool wide for-edittext" data-act="ocr" title="Read all the text on this page with OCR — for scans, flattened pages and text inside pictures (works offline)"><i data-icon="scan"></i><span>Read page (OCR)</span></button>
+    <select id="pOcrLang" class="for-edittext" title="Language of the text to recognise"></select>
     <button class="tool wide for-image" data-act="imgedit" title="Filters, crop, rotate, flip"><i data-icon="sliders"></i><span>Edit image</span></button>
     <button class="tool wide for-image" data-act="bgremove" title="Remove the image background"><i data-icon="wand"></i><span>Remove BG</span></button>
     <button class="fontbtn for-text" id="pFontBtn" data-menu="mFonts" title="Font"><span>Helvetica</span><b>▾</b></button>
@@ -320,6 +322,7 @@
 <script src="lib/fontkit.umd.min.js"></script>
 <script src="lib/jszip.min.js"></script>
 <script src="js/app.js"></script>
+<script src="js/ocr.js"></script>
 <script src="js/imaging.js"></script>
 <script src="js/convert.js"></script>
 <script src="js/organize.js"></script>
