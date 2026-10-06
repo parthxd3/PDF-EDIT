@@ -16,7 +16,7 @@ function createWindow() {
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, plugins: true },
   });
   // a file passed on the command line ("Open with…") is handed to the page, which fetches it from app://xd3/__open__/
-  win.loadURL('app://xd3/index.html' + (fileArg ? '?open=' + encodeURIComponent(path.basename(fileArg)) : ''));
+  win.loadURL('app://xd3/index.html' + (fileArg ? '?open=' + encodeURIComponent(path.basename(fileArg)) : process.env.XD3_SELFTEST ? '?selftest=1' : ''));
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/i.test(url)) { shell.openExternal(url); return { action: 'deny' }; }
     return { action: url.startsWith('blob:') ? 'allow' : 'deny' }; // blob: = the print preview of the edited PDF
@@ -29,12 +29,13 @@ function createWindow() {
   if (process.env.XD3_SELFTEST) { // build check: load the app, report whether it started, quit
     win.webContents.once('did-finish-load', async () => {
       const r = await win.webContents.executeJavaScript(`(async () => {
+        if (window.__selftest) { const t = await window.__selftest; return JSON.stringify({ chrome: navigator.userAgent.match(/Chrome.(\d+)/)[1], ...t }); } // the full suite from tests/, when bundled
         await XD3.ensureFont('Roboto');
         const d = await PDFLib.PDFDocument.create(); d.addPage([200, 200]);
         const pdf = await pdfjsLib.getDocument({ data: await d.save(), isEvalSupported: false }).promise;
         return JSON.stringify({ app: typeof XD3, pdfPages: pdf.numPages, fontkit: typeof fontkit, zip: typeof JSZip, font: document.fonts.check('12px "XD3 Roboto"'), crypto: !!(window.crypto && crypto.subtle), chrome: navigator.userAgent.match(/Chrome.(\\d+)/)[1] });
       })()`).catch(e => 'error: ' + e);
-      console.log('XD3_SELFTEST ' + r); app.exit(0);
+      console.log('XD3_SELFTEST ' + r); app.exit(/"fails":\[\]|"app":"object"/.test(r) ? 0 : 1);
     });
   }
 }

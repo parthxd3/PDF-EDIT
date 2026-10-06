@@ -9,6 +9,8 @@
 <meta name="description" content="Free, fast, private, offline PDF editor by XD3Labs / XDCybertech Pvt Ltd. Edit text and objects, scan, convert Word, compress, protect, annotate, sign, merge and split PDFs entirely on your device.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236d5efc'/%3E%3Cpath d='M9 9l14 14M23 9L9 23' stroke='%23fff' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0e1016">
 </head>
 <body data-mode="select">
 
@@ -101,6 +103,7 @@
       <button class="tool wide" data-act="extract" title="Save chosen pages as a new PDF"><i data-icon="split"></i><span>Extract</span></button>
       <button class="tool wide" data-act="resize" title="Change page size (A4, Letter…)"><i data-icon="fit"></i><span>Page size</span></button>
       <button class="tool wide" data-act="pagenum" title="Add page numbers"><i data-icon="hash"></i><span>Numbers</span></button>
+      <button class="tool wide" data-act="bookmarks" title="Bookmarks shown in the reader's side panel"><i data-icon="bookmark"></i><span>Bookmarks</span></button>
     </div>
 
     <div class="pane" data-pane="convert">
@@ -113,6 +116,10 @@
       <button class="tool wide" data-act="compress" title="Make the PDF smaller — text stays selectable"><i data-icon="compress"></i><span>Compress</span></button>
       <button class="tool wide" data-act="splitzip" title="Split into single-page PDFs (ZIP)"><i data-icon="split"></i><span>Split</span></button>
       <button class="tool wide" data-act="png" title="Export this page as a PNG"><i data-icon="image"></i><span>Page → PNG</span></button>
+      <span class="sep"></span>
+      <button class="tool wide" data-act="ocrall" title="Read scanned pages and keep the text as an invisible, searchable layer"><i data-icon="scan"></i><span>Make searchable</span></button>
+      <button class="tool wide" data-act="compare" title="Compare this document with another PDF"><i data-icon="swap"></i><span>Compare</span></button>
+      <button class="tool wide" data-act="batch" title="Compress, OCR, watermark or number many PDFs at once"><i data-icon="layers"></i><span>Batch</span></button>
     </div>
 
     <div class="pane" data-pane="secure">
@@ -197,13 +204,13 @@
         <button class="btn" data-act="restore" id="bRestore" hidden><i data-icon="undo"></i><span>Restore last session</span></button>
       </div>
       <div class="feats">
-        <div><i data-icon="edittext"></i><b>Edit text</b><span>Rewrite lines or paragraphs in 33 fonts, find &amp; replace</span></div>
+        <div><i data-icon="edittext"></i><b>Edit text</b><span>Rewrite any text in its original font — even in scans and pictures (offline OCR) — fill in forms, find &amp; replace</span></div>
         <div><i data-icon="editobj"></i><b>Edit objects</b><span>Move, resize, rotate, align or delete anything on the page</span></div>
         <div><i data-icon="merge"></i><b>Merge &amp; organize</b><span>Combine PDF, Word and images; reorder, replace, resize, number</span></div>
         <div><i data-icon="word"></i><b>Convert</b><span>PDF ⇄ Word, PDF → images, images → PDF, export text</span></div>
         <div><i data-icon="compress"></i><b>Compress</b><span>Shrink PDFs while keeping text selectable</span></div>
         <div><i data-icon="lock"></i><b>Protect</b><span>Password-protect with AES encryption, permanent redaction</span></div>
-        <div><i data-icon="scan"></i><b>Scan &amp; image tools</b><span>Camera to PDF, background remover, filters, crop</span></div>
+        <div><i data-icon="scan"></i><b>Scan &amp; OCR</b><span>Camera to PDF, searchable scans in 14 languages, compare versions, batch processing</span></div>
         <div><i data-icon="sign"></i><b>Sign &amp; annotate</b><span>Signatures, stamps, highlights, notes, shapes</span></div>
       </div>
       <footer>© <span id="yr"></span> XD3Labs · XDCybertech Pvt Ltd — Free forever. Right-click anywhere for quick actions.</footer>
@@ -272,6 +279,8 @@
   <button data-act="palette" title="Search every command (Ctrl+K)"><i data-icon="bolt"></i><span>Search commands</span><kbd>Ctrl+K</kbd></button>
   <button data-act="newdoc"><i data-icon="pages"></i>New blank document</button>
   <button data-act="props"><i data-icon="info"></i>Document properties…</button>
+  <button data-act="bookmarks"><i data-icon="bookmark"></i>Bookmarks…</button>
+  <button data-act="annots" title="On: shapes, highlights, pen strokes and sticky notes are saved as PDF comments that other readers can edit or hide. Off: they are flattened into the page."><i data-icon="check"></i>Save shapes &amp; notes as PDF comments</button>
   <button data-act="clearpage" class="danger"><i data-icon="trash"></i>Remove all edits on page</button>
   <hr>
   <button data-act="shortcuts"><i data-icon="key"></i>Keyboard shortcuts</button>
@@ -319,12 +328,13 @@
 
 <script src="lib/pdf.min.js"></script>
 <script src="lib/pdf-lib.min.js"></script>
-<script src="lib/fontkit.umd.min.js"></script>
-<script src="lib/jszip.min.js"></script>
 <script src="js/app.js"></script>
 <script src="js/ocr.js"></script>
+<script src="js/insert.js"></script>
 <script src="js/imaging.js"></script>
 <script src="js/convert.js"></script>
+<script src="js/forms.js"></script>
+<script src="js/extras.js"></script>
 <script src="js/organize.js"></script>
 <script src="js/secure.js"></script>
 <script src="js/ui.js"></script>

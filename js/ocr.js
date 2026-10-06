@@ -4,7 +4,7 @@
 'use strict';
 const X = window.XD3, { S, $, PE, toast, clamp } = X;
 const DIR = new URL('lib/ocr/', location.href).href;
-const LANGS = { eng: 'English', 'eng+hin': 'English + Hindi' };
+const LANGS = { eng: 'English', 'eng+hin': 'English + Hindi', 'eng+mar': 'English + Marathi', 'eng+guj': 'English + Gujarati', 'eng+ben': 'English + Bengali', 'eng+pan': 'English + Punjabi', 'eng+tam': 'English + Tamil', 'eng+tel': 'English + Telugu', 'eng+kan': 'English + Kannada', 'eng+mal': 'English + Malayalam', 'eng+ara': 'English + Arabic', 'eng+spa': 'English + Spanish', 'eng+fra': 'English + French', 'eng+deu': 'English + German' };
 const ocrLang = () => { try { const v = localStorage.getItem('xd3.ocr'); return LANGS[v] ? v : 'eng'; } catch (e) { return 'eng'; } };
 
 /* ───────── engine: one background worker, started on first use and released when idle ───────── */
@@ -74,10 +74,27 @@ function badge(p) {
   const b = document.createElement('div'); b.className = 'ocrbadge'; b.innerHTML = '<i></i><span>Reading text…</span>'; pe.wrap.appendChild(b);
   return { set: t => { b.lastChild.textContent = t; }, done: () => b.remove() };
 }
+function skewOf(c) { // the tilt of a scanned page in degrees: the angle at which the rows of text line up best (sharpest row profile)
+  const W = 1000, H = Math.round(c.height * W / c.width), t = document.createElement('canvas'); t.width = W; t.height = H;
+  const g = t.getContext('2d', { willReadFrequently: true }); g.drawImage(c, 0, 0, W, H); const d = g.getImageData(0, 0, W, H).data, pts = [];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; if (d[i] + d[i + 1] + d[i + 2] < 510) pts.push(x, y); }
+  if (pts.length < 2000) return 0;
+  const score = a => { const tn = Math.tan(a * Math.PI / 180), rows = new Float64Array(Math.ceil((H + W) / 3) + 1); let n = 0; for (let i = 0; i < pts.length; i += 2) { const r = Math.floor((pts[i + 1] - pts[i] * tn + (W >> 1)) / 3); if (r >= 0 && r < rows.length) { rows[r]++; n++; } } let m = 0; for (const v of rows) m += v * v; return m / Math.max(1, n); }; // (3-pixel bins, so exact pixel rows give 0° no unfair head start)
+  let best = 0, bs = -1; for (let a = -6; a <= 6; a += 0.5) { const sc = score(a); if (sc > bs) { bs = sc; best = a; } }
+  for (let a = best - 0.45; a <= best + 0.45; a += 0.1) { const sc = score(a); if (sc > bs) { bs = sc; best = a; } }
+  return Math.abs(best) < 0.25 || Math.abs(best) >= 6 ? 0 : Math.round(best * 10) / 10;
+}
+function straighten(cv, deg) { // the page picture turned by -deg about its centre (same size), plus a function mapping points back
+  const c = document.createElement('canvas'); c.width = cv.c.width; c.height = cv.c.height; const g = c.getContext('2d', { willReadFrequently: true });
+  g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.translate(c.width / 2, c.height / 2); g.rotate(-deg * Math.PI / 180); g.drawImage(cv.c, -c.width / 2, -c.height / 2);
+  const cx = c.width / 2 / cv.k, cy = c.height / 2 / cv.k, a = deg * Math.PI / 180, cs = Math.cos(a), sn = Math.sin(a);
+  return { cv: { c, k: cv.k }, back: (x, y) => [cx + (x - cx) * cs - (y - cy) * sn, cy + (x - cx) * sn + (y - cy) * cs] };
+}
 async function run(p, regs, lang, force) {
   const b = badge(p), out = [], gone = () => !force && !X.visible.has(p.id); // pages scrolled out of view give up their turn (they are read when they come back)
   try {
-    const cv = await X.baseCanvas(p, 3), k = cv.k;
+    let cv = await X.baseCanvas(p, 3), deg = 0, st = null; const k = cv.k;
+    if (regs.full) { deg = skewOf(cv.c); if (deg) { st = straighten(cv, deg); cv = st.cv; } }
     for (let i = 0; i < regs.length; i++) {
       const r = regs[i], pad = 6, x = clamp(Math.floor(r.x * k) - pad, 0, cv.c.width - 1), y = clamp(Math.floor(r.y * k) - pad, 0, cv.c.height - 1);
       const w = Math.min(cv.c.width - x, Math.ceil(r.w * k) + 2 * pad), h = Math.min(cv.c.height - y, Math.ceil(r.h * k) + 2 * pad); if (w < 24 || h < 16) continue;
@@ -86,6 +103,10 @@ async function run(p, regs, lang, force) {
       const prog = f => b.set(`Reading text… ${Math.round((i + f) / regs.length * 100)}%`);
       let found = linesOf(await job(c, lang, prog, '3', gone), k * s, x / k, y / k);
       if (!found.length && !regs.full && r.h < 160) found = linesOf(await job(c, lang, prog, '6', gone), k * s, x / k, y / k); // a small label: read it as a single block
+      if (st) for (const ln of found) { // read on the straightened picture → placed back where it really is, as a turned line
+        const d = { ...ln, cv: cv, back: st.back }, [cx, cy] = st.back(ln.x + ln.w / 2, ln.y + ln.h / 2);
+        Object.assign(ln, { x: cx - ln.w / 2, y: cy - ln.h / 2, base: cy - ln.h / 2 + (ln.base - ln.y), rot: deg, o: st.back(ln.x, ln.base), d });
+      }
       out.push(...found);
     }
   } finally { b.done(); }
@@ -110,7 +131,7 @@ function ocrItems(p, force) { // lines of text recognised in the page's pictures
 const ocrCached = p => { const e = cache.get(keyOf(p)); return (e && e.lines) || []; };
 
 /* ───────── matching a typeface to printed text ───────── */
-const STD = ['Helvetica', 'Times', 'Courier'], FAMS = [...STD, 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins', 'Raleway', 'Nunito', 'Ubuntu', 'Oswald', 'Lora', 'PT Serif', 'Libre Baskerville', 'Playfair Display', 'Crimson Text', 'Roboto Slab', 'Roboto Mono', 'Source Code Pro'], CANDS = [];
+const STD = ['Helvetica', 'Times', 'Courier'], FAMS = [...STD, 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins', 'Raleway', 'Nunito', 'Ubuntu', 'Oswald', 'Carlito', 'DejaVu Sans', 'Lora', 'PT Serif', 'Libre Baskerville', 'Playfair Display', 'Crimson Text', 'Caladea', 'Gelasio', 'Roboto Slab', 'Roboto Mono', 'Source Code Pro'], CANDS = [];
 for (const font of FAMS) for (const bold of [false, true]) for (const italic of STD.includes(font) ? [false, true] : [false]) CANDS.push({ font, bold, italic });
 const fctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true }), tctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
 const MONO = new Set(['Courier', 'Roboto Mono', 'Source Code Pro']);

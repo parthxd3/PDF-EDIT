@@ -1,0 +1,51 @@
+# XD3 PDF Editor - web hosting settings (Apache / LiteSpeed, e.g. Hostinger). The app is a static site: no PHP, no database.
+
+DirectoryIndex index.html
+Options -Indexes
+
+# Uncomment the four lines below once SSL is active on the domain (Hostinger: hPanel > Security > SSL).
+# HTTPS is needed for the camera in "Scan document" and for the clipboard buttons.
+#<IfModule mod_rewrite.c>
+#  RewriteEngine On
+#  RewriteCond %{HTTPS} off
+#  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+#</IfModule>
+
+<IfModule mod_mime.c>
+  AddDefaultCharset utf-8
+  AddType text/javascript .js
+  AddType font/ttf .ttf
+  AddType application/octet-stream .bcmap .pfb
+  # OCR language data is unpacked by the app itself: serve the .gz files as plain downloads
+  RemoveEncoding .gz
+  AddType application/gzip .gz
+  AddType application/manifest+json .webmanifest
+</IfModule>
+
+# Send text files compressed (the OCR engine alone shrinks from 4 MB to about 1.5 MB)
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml
+</IfModule>
+
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set Referrer-Policy "no-referrer"
+  # the same lock-down as the <meta> tag in index.html, as a real header
+  Header set Content-Security-Policy "default-src 'self' data: blob:; script-src 'self' blob: 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:; worker-src 'self' blob:; frame-src blob:; media-src 'self' blob: mediastream:; object-src 'none'; base-uri 'none'"
+  # The page and its own scripts are re-checked on every visit, so an update shows at once ...
+  <FilesMatch "\.(html|css|js)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+  # ... while the big bundled libraries, fonts and OCR data are kept by the browser
+  <FilesMatch "\.(ttf|pfb|bcmap|gz)$">
+    Header set Cache-Control "public, max-age=2592000"
+  </FilesMatch>
+  <FilesMatch "(\.min\.js|\.wasm\.js)$">
+    Header set Cache-Control "public, max-age=2592000"
+  </FilesMatch>
+</IfModule>
+
+# Nothing but the app itself is served
+<FilesMatch "(^\.|\.(bat|md|log|py)$)">
+  Require all denied
+</FilesMatch>

@@ -20,6 +20,11 @@ X.ACT.theme = () => { animateTheme(); root.dataset.theme = root.dataset.theme ==
 X.ACT.accent = b => { animateTheme(); setAccent(b.dataset.v); store.set('xd3.accent', b.dataset.v); };
 setAccent(store.get('xd3.accent')); themeIcon();
 
+/* ───────── hosted copy: works offline after the first visit and can be installed like an app; ?selftest=1 runs the checks ───────── */
+const params = new URLSearchParams(location.search);
+if (params.has('selftest')) { const s = document.createElement('script'); s.src = 'tests/selftest.js'; document.head.appendChild(s); }
+else if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { /* not available on this host */ });
+
 /* ───────── notification panel (the bell) ───────── */
 const ICON = { success: 'check', error: 'x', warn: 'info', info: 'info' };
 const ago = t => { const s = Math.round((Date.now() - t) / 1000); return s < 45 ? 'now' : s < 3600 ? Math.round(s / 60) + ' min' : Math.round(s / 3600) + ' h'; };

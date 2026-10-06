@@ -31,6 +31,8 @@ copy /y "index.html" "%STAGE%\www\" >nul
 xcopy /e /i /q /y "css" "%STAGE%\www\css" >nul
 xcopy /e /i /q /y "js" "%STAGE%\www\js" >nul
 xcopy /e /i /q /y "lib" "%STAGE%\www\lib" >nul
+if exist "icons" xcopy /e /i /q /y "icons" "%STAGE%\www\icons" >nul
+if exist "tests\samples" xcopy /e /i /q /y "tests" "%STAGE%\www	ests" >nul
 set "ICON="
 if exist "desktop\icon.ico" copy /y "desktop\icon.ico" "%STAGE%\" >nul
 if exist "desktop\icon.ico" set ICON=--icon="%STAGE%\icon.ico"

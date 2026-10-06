@@ -8,3 +8,7 @@ Apache License 2.0: Roboto, Roboto Slab, Roboto Mono, Permanent Marker
 Ubuntu Font Licence 1.0: Ubuntu
 
 Licence texts: https://openfontlicense.org  ·  https://www.apache.org/licenses/LICENSE-2.0  ·  https://ubuntu.com/legal/font-licence
+
+Metric-compatible stand-ins for common Office fonts (used when a PDF names a font we cannot ship, and for matching scanned text):
+SIL Open Font License 1.1: Carlito (for Calibri), Caladea (for Cambria), Gelasio (for Georgia)
+Bitstream Vera / DejaVu licence: DejaVu Sans (for Verdana, Tahoma)

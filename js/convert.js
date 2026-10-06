@@ -44,7 +44,7 @@ async function pageContent(p) { // visible text lines (with style) + images, in 
 }
 
 /* ───────── PDF → DOCX ───────── */
-const FAM = { Helvetica: 'Arial', Times: 'Times New Roman', Courier: 'Courier New' };
+const FAM = { Helvetica: 'Arial', Times: 'Times New Roman', Courier: 'Courier New', Carlito: 'Calibri', Caladea: 'Cambria', Gelasio: 'Georgia', 'DejaVu Sans': 'Verdana' };
 function runXml(l, text) {
   const f = FAM[l.font] || X.esc(X.fontLabel(l.font || '').replace(/ (Bold|Italic)\b/g, '')) || 'Arial', col = l.color && l.color !== '#000000' ? `<w:color w:val="${l.color.slice(1).toUpperCase()}"/>` : '', sz = Math.max(2, Math.round(l.size * 2));
   const rpr = `<w:rPr><w:rFonts w:ascii="${f}" w:hAnsi="${f}" w:cs="${f}"/>${l.bold ? '<w:b/>' : ''}${l.italic ? '<w:i/>' : ''}${l.strike ? '<w:strike/>' : ''}${col}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>${l.underline ? '<w:u w:val="single"/>' : ''}</w:rPr>`;
@@ -116,6 +116,7 @@ function framePage(pc, p, B) { // every line pinned at its exact position (text 
   return { paras, margins: { t: 10, l: 10, r: 10, b: 10 } };
 }
 async function pdfToDocx() {
+  await X.loadLib('jszip');
   const r = await dialog('PDF → Word (.docx)', `
     <label>Layout<select name="mode">
       <option value="flow">Editable text — flowing paragraphs (best for editing)</option>
@@ -182,6 +183,7 @@ const fmtNum = (n, fmt) => {
 };
 
 async function docxToPages(file) {
+  await X.loadLib('jszip');
   let zip; try { zip = await JSZip.loadAsync(await file.arrayBuffer()); } catch (e) { throw new Error('Could not read this Word file — is it a valid .docx?'); }
   const xml = async n => { const f = zip.file(n); return f ? new DOMParser().parseFromString(await f.async('string'), 'application/xml') : null; };
   const doc = await xml('word/document.xml'); if (!doc || !doc.documentElement || doc.getElementsByTagName('parsererror').length) throw new Error('This is not a valid .docx file');
@@ -352,6 +354,7 @@ async function docxToPages(file) {
 
 /* ───────── other exports ───────── */
 async function pdfToImages() {
+  await X.loadLib('jszip');
   const r = await dialog('PDF → Images', `
     <div class="row"><label>Format<select name="fmt"><option value="png">PNG (sharp, larger)</option><option value="jpg">JPG (smaller)</option></select></label>
     <label>Resolution<select name="dpi"><option value="96">96 dpi (screen)</option><option value="150" selected>150 dpi</option><option value="200">200 dpi</option><option value="300">300 dpi (print)</option></select></label></div>
@@ -368,6 +371,7 @@ async function pdfToImages() {
   }, 'Rendering pages…');
 }
 async function splitZip() {
+  await X.loadLib('jszip');
   if (S.pages.length < 2) return toast('This document has only one page');
   await busy(async () => {
     const zip = new JSZip(), len = String(S.pages.length).length;

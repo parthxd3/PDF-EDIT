@@ -22,6 +22,7 @@ const BUNDLED = {
   'Nunito': ['Nunito', 1, 'sans-serif', 'Sans serif'], 'Ubuntu': ['Ubuntu', 1, 'sans-serif', 'Sans serif'], 'Hind': ['Hind', 1, 'sans-serif', 'Sans serif'],
   'Playfair Display': ['PlayfairDisplay', 1, 'serif', 'Serif'], 'Lora': ['Lora', 1, 'serif', 'Serif'], 'Libre Baskerville': ['LibreBaskerville', 1, 'serif', 'Serif'],
   'PT Serif': ['PTSerif', 1, 'serif', 'Serif'], 'Crimson Text': ['CrimsonText', 1, 'serif', 'Serif'], 'Roboto Slab': ['RobotoSlab', 1, 'serif', 'Serif'],
+  'Carlito': ['Carlito', 1, 'sans-serif', 'Sans serif'], 'DejaVu Sans': ['DejaVuSans', 1, 'sans-serif', 'Sans serif'], 'Caladea': ['Caladea', 1, 'serif', 'Serif'], 'Gelasio': ['Gelasio', 1, 'serif', 'Serif'], // (stand-ins for Calibri, Verdana / Tahoma, Cambria, Georgia)
   'Roboto Mono': ['RobotoMono', 1, 'monospace', 'Monospace'], 'Source Code Pro': ['SourceCodePro', 1, 'monospace', 'Monospace'],
   'Oswald': ['Oswald', 1, 'sans-serif', 'Display'], 'Anton': ['Anton', 0, 'sans-serif', 'Display'], 'Lobster': ['Lobster', 0, 'cursive', 'Display'], 'Comic Neue': ['ComicNeue', 1, 'cursive', 'Display'], 'Permanent Marker': ['PermanentMarker', 0, 'cursive', 'Display'],
   'Caveat': ['Caveat', 1, 'cursive', 'Handwriting'], 'Pacifico': ['Pacifico', 0, 'cursive', 'Handwriting'], 'Satisfy': ['Satisfy', 0, 'cursive', 'Handwriting'], 'Courgette': ['Courgette', 0, 'cursive', 'Handwriting'],
@@ -42,6 +43,7 @@ function ensureFont(name) { // start loading a bundled (or document) font; resol
 }
 function fontsChanged() { clearTimeout(fontsChanged.t); fontsChanged.t = setTimeout(() => { S.pages.forEach(drawObjs); drawSel(); }, 30); } // text widths change once the real font arrives
 const fontBytes = stem => fontData[stem] || (fontData[stem] = fetch(`lib/fonts/${stem}.ttf`).then(r => { if (!r.ok) throw new Error('font file missing'); return r.arrayBuffer(); }));
+const LOOKALIKE = [[/calibri|carlito/i, 'Carlito'], [/cambria|caladea/i, 'Caladea'], [/georgia|gelasio/i, 'Gelasio'], [/verdana|tahoma|dejavu|bitstreamvera|segoe/i, 'DejaVu Sans']]; // fonts we cannot ship → the metric-compatible free face
 const fontFamilyFor = pdfName => { const k = String(pdfName || '').toLowerCase().replace(/[^a-z]/g, ''); return Object.keys(BUNDLED).sort((a, b) => b.length - a.length).find(n => k.includes(n.toLowerCase().replace(/ /g, ''))) || null; };
 // Fonts lifted out of the opened PDFs (S.xfonts: id → { name, ps, bytes, bold, italic, fb }). Text edited in place keeps the document's own typeface,
 // on screen and in the saved file; characters the embedded (usually subsetted) font does not contain fall back to the nearest family, `fb`.
@@ -95,7 +97,7 @@ const ICONS = {
   dist_h: 'M4 4v16M20 4v16M9 8h6v8H9z', dist_v: 'M4 4h16M4 20h16M8 9h8v6H8z', brush: 'M4 20c3 0 4-2 4-4l8-9 3 3-9 8c-2 0-3 1-6 2zM14 5l5 5',
   selall: 'M4 4h4M4 4v4M20 4h-4M20 4v4M4 20h4M4 20v-4M20 20h-4M20 20v-4M9 12l2 2 4-4', compress: 'M12 3v6M9 6l3 3 3-3M12 21v-6M9 18l3-3 3 3M4 12h16', minus: 'M5 12h14',
   bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0', bolt: 'M13 3L5 13h6l-1 8 8-10h-6z', sun: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5',
-  cut: 'M6 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM6 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM8 9l12 8M8 15L20 7',
+  cut: 'M6 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM6 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM8 9l12 8M8 15L20 7', bookmark: 'M6 3h12v18l-6-4-6 4z',
 };
 const HINTS = {
   select: 'Click to select · drag to move · corner handles resize · top handle rotates · Shift+click or drag a box to select several · double‑click text to edit',
@@ -107,7 +109,7 @@ const HINTS = {
   pen: 'Draw freehand', marker: 'Drag over content to highlight freehand', hl: 'Drag a box to highlight an area',
   rect: 'Drag to draw a rectangle (Shift = square)', ellipse: 'Drag to draw an ellipse (Shift = circle)',
   line: 'Drag to draw a line (Shift = 45° steps)', arrow: 'Drag to draw an arrow (Shift = 45° steps)',
-  whiteout: 'Drag a box to cover content with white', redact: 'Drag a box to black out content (visual cover only)',
+  whiteout: 'Drag a box to cover content with white', redact: 'Drag a box to black out content — when you save, pages with blackouts become pictures so the hidden text is really gone',
 };
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -124,7 +126,7 @@ const S = {
   sources: [], pages: [], assets: {}, zoom: 1, tool: 'select', sel: null, cur: 0, srcVer: 0,
   undo: [], redo: [], fileName: 'document.pdf', dirty: false, meta: {}, editing: null, clip: null,
   style: { color: '#111111', fill: 'none', width: 2, dash: 'solid', rx: 0, size: 16, font: 'Helvetica', bold: false, italic: false, underline: false, strike: false, align: 'left', lh: 1.2, opacity: 1 },
-  para: false, xfonts: {}, styleClip: null, ctxPt: null, notes: [], unread: 0,
+  para: false, xfonts: {}, outline: [], styleClip: null, ctxPt: null, notes: [], unread: 0,
   find: { q: '', hits: [], cur: -1 },
 };
 const PE = new Map(), visible = new Set();
@@ -179,6 +181,13 @@ const selOne = () => { const s = selObjs(); return s && s.os.length === 1 ? { p:
 const editingObj = () => { if (!S.editing) return null; const p = pageById(S.editCtx.pid); return p && p.objs.find(o => o.id === S.editing) || null; };
 const baseName = () => S.fileName.replace(/\.pdf$/i, '');
 const getPdfPage = p => S.sources[p.src].pdf.getPage(p.idx + 1);
+const libLoaded = {}, LIBS = { fontkit: ['lib/fontkit.umd.min.js', 'fontkit'], jszip: ['lib/jszip.min.js', 'JSZip'] };
+function loadLib(name) { // fontkit (saving with bundled fonts) and JSZip (Word, ZIP exports) are fetched the first time they are needed, so the page starts faster
+  return libLoaded[name] || (libLoaded[name] = new Promise((res, rej) => {
+    const [src, g] = LIBS[name]; if (window[g]) return res(window[g]);
+    const el = document.createElement('script'); el.src = src; el.onload = () => res(window[g]); el.onerror = () => { delete libLoaded[name]; rej(new Error(name + ' library is missing (lib/)')); }; document.head.appendChild(el);
+  }));
+}
 
 /* ───────── session autosave (IndexedDB) ───────── */
 const DB = {
@@ -194,7 +203,7 @@ async function saveSession() {
     if (savedSrcVer !== S.srcVer) { await DB.put('src', S.sources.map(s => s.bytes)); savedSrcVer = S.srcVer; }
     const used = new Set(), xf = {}; for (const p of S.pages) for (const o of p.objs) if (o.type === 'text') used.add(o.font);
     for (const id in S.xfonts) if (used.has(id)) xf[id] = S.xfonts[id];
-    await DB.put('session', { fileName: S.fileName, meta: S.meta, pages: S.pages, assets: S.assets, xfonts: xf, n: S.sources.length });
+    await DB.put('session', { fileName: S.fileName, meta: S.meta, pages: S.pages, assets: S.assets, xfonts: xf, outline: S.outline, n: S.sources.length });
   } catch (e) { /* storage unavailable — autosave is best-effort */ }
 }
 async function restoreSession() {
@@ -204,7 +213,7 @@ async function restoreSession() {
     resetDoc();
     for (const b of srcs.slice(0, ses.n)) await addSource(b);
     savedSrcVer = S.srcVer;
-    Object.assign(S, { pages: ses.pages, assets: ses.assets || {}, xfonts: ses.xfonts || {}, fileName: ses.fileName || 'document.pdf', meta: ses.meta || {}, dirty: true });
+    Object.assign(S, { pages: ses.pages, assets: ses.assets || {}, xfonts: ses.xfonts || {}, outline: ses.outline || [], fileName: ses.fileName || 'document.pdf', meta: ses.meta || {}, dirty: true });
     buildPages(); S.zoom = clamp(fitZoom(), 0.25, 1.25); layout(); syncControls(); updateUI(); toast('Session restored');
   }, 'Restoring…');
 }
@@ -224,7 +233,7 @@ function redo() { if (!S.redo.length) return; const s = snap(); const r = S.redo
 /* ───────── loading ───────── */
 function resetDoc() {
   commitEdit();
-  Object.assign(S, { sources: [], pages: [], assets: {}, xfonts: {}, undo: [], redo: [], sel: null, cur: 0, meta: {}, dirty: false, find: { q: '', hits: [], cur: -1 } });
+  Object.assign(S, { sources: [], pages: [], assets: {}, xfonts: {}, outline: [], undo: [], redo: [], sel: null, cur: 0, meta: {}, dirty: false, find: { q: '', hits: [], cur: -1 } });
   S.srcVer++;
 }
 async function addSource(bytes) {
@@ -281,7 +290,7 @@ async function openFiles(files, append) {
     let first = !append;
     try {
       for (const f of files) {
-        if (isPdf(f)) S.pages.push(...await loadSource(new Uint8Array(await f.arrayBuffer())));
+        if (isPdf(f)) { const pg = await loadSource(new Uint8Array(await f.arrayBuffer())); S.pages.push(...pg); if (first && pg.length && window.XD3.readOutline) S.outline = await window.XD3.readOutline(S.sources[pg[0].src].pdf, pg); }
         else if (isDocx(f)) S.pages.push(...await window.XD3.docxToPages(f));
         else S.pages.push(imagePage(await readImage(f)));
         if (first) { S.fileName = f.name.replace(/\.\w+$/, '') + '.pdf'; first = false; }
@@ -309,7 +318,7 @@ function buildPages() {
   viewer.textContent = ''; thumbs.textContent = ''; PE.clear(); visible.clear();
   io = new IntersectionObserver(ens => ens.forEach(en => {
     const id = en.target.dataset.id, p = pageById(id);
-    if (en.isIntersecting) { visible.add(id); if (p) { renderCanvas(p); drawTI(p); } } else visible.delete(id);
+    if (en.isIntersecting) { visible.add(id); const pe = PE.get(id); if (pe) pe.seen = Date.now(); if (p) { renderCanvas(p); drawTI(p); } } else { visible.delete(id); trimCanvases(); }
   }), { root: viewer, rootMargin: '600px 0px' });
   tio = new IntersectionObserver(ens => ens.forEach(en => {
     if (!en.isIntersecting) return; tio.unobserve(en.target); const p = pageById(en.target.dataset.id); if (p) renderThumb(p, en.target);
@@ -339,6 +348,10 @@ function buildPages() {
   icons(thumbs);
   S.cur = clamp(S.cur, 0, Math.max(0, S.pages.length - 1));
   layout(); S.pages.forEach(drawObjs); drawFind(); updateUI();
+}
+function trimCanvases() { // pages far from view give their bitmaps back, so a 300-page scan does not hold hundreds of MB
+  const done = [...PE.entries()].filter(([id, pe]) => pe.done && !visible.has(id)).sort((a, b) => (a[1].seen || 0) - (b[1].seen || 0));
+  for (let i = 0; i < done.length - 20; i++) { const pe = done[i][1], c = document.createElement('canvas'); c.width = c.height = 1; pe.canvas.replaceWith(c); pe.canvas = c; pe.key = pe.done = ''; }
 }
 function layout() {
   const sc = scaleCss();
@@ -523,7 +536,7 @@ const NEW = {
   pen: (P, st) => ({ type: 'path', pts: [P], color: st.color, width: st.width, opacity: st.opacity }),
   marker: P => ({ type: 'path', pts: [P], color: '#facc15', width: 14, opacity: 0.4, blend: true }),
   hl: P => cover(P, '#facc15', { opacity: 0.4, blend: true }),
-  whiteout: P => cover(P, '#ffffff', { cover: true }), redact: P => cover(P, '#000000', { cover: true }),
+  whiteout: P => cover(P, '#ffffff', { cover: true }), redact: P => cover(P, '#000000', { cover: true, redact: true }),
   rect: (P, st) => shape('rect', P, st), ellipse: (P, st) => shape('ellipse', P, st),
   line: (P, st) => ({ type: 'line', x1: P[0], y1: P[1], x2: P[0], y2: P[1], color: st.color, width: st.width, dash: st.dash, opacity: st.opacity }),
   arrow: (P, st) => ({ type: 'arrow', x1: P[0], y1: P[1], x2: P[0], y2: P[1], color: st.color, width: st.width, dash: st.dash, opacity: st.opacity }),
@@ -552,7 +565,7 @@ function onDown(e, pid) {
     if (hit && hit.type === 'text') return startEdit(p, hit, snap());
     const st = S.style, before = snap(), note = tool === 'note', size = note ? 12 : st.size;
     const o = { id: uid(), type: 'text', x: P[0], y: P[1] - size * 0.6, text: '', size, color: note ? '#1f2937' : st.color, font: st.font, bold: !note && st.bold, italic: !note && st.italic,
-      underline: !note && st.underline, strike: !note && st.strike, align: note ? 'left' : st.align, lh: note ? LH : st.lh, bg: note ? '#fef08a' : 'none', opacity: note ? 1 : st.opacity };
+      underline: !note && st.underline, strike: !note && st.strike, align: note ? 'left' : st.align, lh: note ? LH : st.lh, bg: note ? '#fef08a' : 'none', opacity: note ? 1 : st.opacity, ...(note ? { note: true } : {}) };
     p.objs.push(o); return startEdit(p, o, before);
   } else if (tool === 'edittext') {
     if (hit && hit.type === 'text') { e.preventDefault(); return startEdit(p, hit, snap()); }
@@ -759,9 +772,9 @@ async function drawTI(p) {
   }
   const paint = items => {
     pe.items = items = items.filter(it => !covered(p, it)); pe.gTI.textContent = '';
-    items.forEach((it, i) => { const a = { x: it.x - 1, y: it.y, width: it.w + 2, height: it.h, class: it.ocr ? 'ti ocr' : 'ti', 'data-ti': i }; if (it.rot) a.transform = `rotate(${it.rot} ${r2(it.x + it.w / 2)} ${r2(it.y + it.h / 2)})`; svg('rect', a, pe.gTI); });
+    items.forEach((it, i) => { const a = { x: it.x - 1, y: it.y, width: it.w + 2, height: it.h, class: it.field ? 'ti form' : it.ocr ? 'ti ocr' : 'ti', 'data-ti': i }; if (it.rot) a.transform = `rotate(${it.rot} ${r2(it.x + it.w / 2)} ${r2(it.y + it.h / 2)})`; svg('rect', a, pe.gTI); });
   };
-  const nat = para ? await getBlocks(p) : await getText(p); if (stale()) return; paint(nat);
+  const nat = [...(para ? await getBlocks(p) : await getText(p)), ...(window.XD3.formItems ? await window.XD3.formItems(p) : [])]; if (stale()) return; paint(nat);
   const oc = await ocrOf(p).catch(() => []); if (stale() || !oc.length) return; // text inside pictures and scans arrives a little later
   paint([...nat, ...(para ? toBlocks(oc) : oc)]);
 }
@@ -851,7 +864,7 @@ async function origFont(p, it, light) { // the typeface an original line is set 
   if (!it.fontName) return { font: it.font || 'Helvetica', bold: false, italic: false, real: '', family: null };
   const s = S.sources[p.src], key = it.fontName + (light ? '|l' : ''); if (s.fonts[key]) return s.fonts[key];
   let f = null; try { const pg = await getPdfPage(p); if (!pg.commonObjs.has(it.fontName)) await scanPage(p); f = await pdfFont(pg, it.fontName); } catch (e) { /* described by its fallback below */ }
-  const name = (f && f.name) || '', fam = fontFamilyFor(name), bold = !!f && (!!f.black || /bold|black|heavy|semibold|demi/i.test(name)), italic = /ital|obli/i.test(name) || !!(f && f.italic);
+  const name = (f && f.name) || '', fam = fontFamilyFor(name) || (LOOKALIKE.find(([re]) => re.test(name)) || [])[1] || null, bold = !!f && (!!f.black || /bold|black|heavy|semibold|demi/i.test(name)), italic = /ital|obli/i.test(name) || !!(f && f.italic);
   const fb = fam || (/courier|mono|consol|typewriter/i.test(name) ? 'Courier' : /times|georgia|cambria|garamond|palatino|minion|bookman|century|serif|nimbusrom|cmr\d|cmbx|cmti/i.test(name) && !/sans/i.test(name) ? 'Times' : /arial|helvet|verdana|tahoma|calibri|segoe|sans/i.test(name) ? 'Helvetica' : it.font || 'Helvetica');
   const out = { font: fb, bold, italic, real: name ? cleanFontName(name) : '', family: fam, type3: !!(f && f.isType3Font) };
   if (!light && f && f.data && f.data.length > 200 && !f.isType3Font) { // embedded in the PDF → keep using that very font
@@ -863,13 +876,17 @@ async function origFont(p, it, light) { // the typeface an original line is set 
 }
 async function fontStyle(p, fontName) { const f = await origFont(p, { fontName }, true); return { bold: f.bold, italic: f.italic, family: f.family, real: f.real }; } // bold / italic / family of an embedded font
 async function editOriginal(p, it, str) { // cover an original line / paragraph and put an editable copy on top, in the same font
-  const L = it.lines || [it], X = window.XD3, fx = it.ocr || it.hidden ? null : await origFont(p, it), visual = (!fx || fx.type3) && X.fitLine && !it.rot;
+  const L = it.lines || [it], X = window.XD3, fx = it.ocr || it.hidden ? null : await origFont(p, it), visual = (!fx || fx.type3) && X.fitLine && (!it.rot || it.d);
   const cv = await baseCanvas(p, visual ? 3 : 1.2), text = str == null ? it.str : str; let o = null, hi = null;
   if (visual) { // printed / scanned text has no font to reuse: measure the ink and pick the closest typeface, size and colour
-    const long = L.reduce((a, b) => b.str.length > a.str.length ? b : a), f = await X.fitLine(cv, long), f1 = f && (L[0] === long ? f : await X.fitLine(cv, L[0], f));
+    const long = L.reduce((a, b) => b.str.length > a.str.length ? b : a), cvF = it.d ? it.d.cv : cv, f = await X.fitLine(cvF, it.d ? it.d : long), f1 = f && (L[0] === long || it.d ? f : await X.fitLine(cvF, L[0], f));
     if (f && f1) {
       o = textObj(text, f.size, { color: f.color, font: f.font, bold: f.bold, italic: f.italic, lh: L.length > 1 ? clamp((L[L.length - 1].base - L[0].base) / (L.length - 1) / f.size, 0.9, 3) : LH });
-      await ensureFont(o.font); o.x = f1.x; o.y = f1.base - baseOff(o);
+      await ensureFont(o.font);
+      if (it.d) { // a line on a crooked scan: fitted on the straightened picture, placed back at its real angle
+        const O = it.d.back(f1.x, f1.base), b = bbox(o), a = it.rot * Math.PI / 180, cs = Math.cos(a), sn = Math.sin(a), vx = -b.w / 2, vy = baseOff(o) - b.h / 2;
+        o.rot = it.rot; o.x = O[0] - (vx * cs - vy * sn) - b.w / 2; o.y = O[1] - (vx * sn + vy * cs) - b.h / 2;
+      } else { o.x = f1.x; o.y = f1.base - baseOff(o); }
     }
   }
   if (!o) {
@@ -890,6 +907,7 @@ async function editOriginal(p, it, str) { // cover an original line / paragraph 
 }
 async function convertTextItem(p, i) {
   const pe = PE.get(p.id), it = (pe && pe.items ? pe.items : S.para ? await getBlocks(p) : await getText(p))[i]; if (!it) return;
+  if (it.field) return window.XD3.fillField(p, it);
   const before = snap(), o = await editOriginal(p, it); startEdit(p, o, before, true);
 }
 function toBlocks(lines) { // lines grouped into paragraphs for paragraph-mode editing
@@ -1211,12 +1229,12 @@ const insertSub = () => [mi('Image…', 'image', 'image'), mi('Signature…', 's
 const pageSub = () => { const n = S.pages.length, p = S.pages[S.cur]; return [
   mi('Rotate right', 'rotate', 'rotr'), mi('Rotate left', 'rotatel', 'rotl'), mi('Duplicate', 'copy', 'dup'), mi('Insert blank page after', 'plus', 'blank'), mi('Replace with another file…', 'swap', 'replacepage'), '-',
   mi('Move up', 'up', 'pgup', { disabled: S.cur === 0 }), mi('Move down', 'down', 'pgdown', { disabled: S.cur >= n - 1 }), mi('Move to start', 'front', 'pgtop', { disabled: S.cur === 0 }), mi('Move to end', 'back', 'pgend', { disabled: S.cur >= n - 1 }), '-',
-  mi('Extract…', 'split', 'extract'), mi('Change size…', 'fit', 'resize'), mi('Add page numbers…', 'hash', 'pagenum'), mi('Export as PNG', 'image', 'png'), '-',
+  mi('Extract…', 'split', 'extract'), mi('Change size…', 'fit', 'resize'), mi('Add page numbers…', 'hash', 'pagenum'), mi('Bookmarks…', 'bookmark', 'bookmarks'), mi('Export as PNG', 'image', 'png'), '-',
   mi('Remove all edits on page', 'eraser', 'clearpage', { disabled: !p || !p.objs.length }), mi('Delete page', 'trash', 'delpage', { danger: 1, disabled: n < 2 })]; };
 const zoomSub = () => [mi('Zoom in', 'zoomin', 'zoomin', { key: 'Ctrl +' }), mi('Zoom out', 'zoomout', 'zoomout', { key: 'Ctrl −' }), mi('Actual size (100%)', '', 'zoomreset', { key: 'Ctrl+0' }), mi('Fit width', 'fit', 'fit'), mi('Fit whole page', 'pages', 'fitpage'), '-',
   mi('Show / hide page panel', 'panel', 'sidebar'), mi('Light / dark theme', 'moon', 'theme')];
 const convertSub = () => [mi('PDF → Word (.docx)…', 'word', 'pdf2docx'), mi('PDF → Images…', 'image', 'pdf2img'), mi('Export text (.txt)', 'text', 'exporttxt'), '-',
-  mi('Compress…', 'compress', 'compress'), mi('Split into single pages', 'split', 'splitzip'), '-', mi('Password protect…', 'lock', 'protect'), mi('Flatten (permanent redaction)…', 'layers', 'flatten')];
+  mi('Compress…', 'compress', 'compress'), mi('Split into single pages', 'split', 'splitzip'), '-', mi('Make searchable (OCR)…', 'scan', 'ocrall'), mi('Compare with another PDF…', 'swap', 'compare'), mi('Batch process…', 'layers', 'batch'), '-', mi('Password protect…', 'lock', 'protect'), mi('Flatten (permanent redaction)…', 'layers', 'flatten')];
 const editItems = () => [mi('Undo', 'undo', 'undo', { key: 'Ctrl+Z', disabled: !S.undo.length }), mi('Redo', 'redo', 'redo', { key: 'Ctrl+Y', disabled: !S.redo.length })];
 const clipMenu = () => [mi('Cut', 'cut', 'ed_cut', { key: 'Ctrl+X', keep: 1 }), mi('Copy', 'copy', 'ed_copy', { key: 'Ctrl+C', keep: 1 }), mi('Paste', 'pages', 'ed_paste', { key: 'Ctrl+V', keep: 1 }), mi('Select all', 'selall', 'ed_selall', { key: 'Ctrl+A', keep: 1 })];
 const textStyleSub = (o, keep) => [
@@ -1320,7 +1338,7 @@ function newTextAt(note) { // from the right-click menu: add text / a note where
   const p = S.ctxPt ? pageById(S.ctxPt.pid) : S.pages[S.cur]; if (!p) return;
   const P = S.ctxPt ? S.ctxPt.P : viewCenter(p), st = S.style, before = snap(), size = note ? 12 : st.size;
   setTool(note ? 'note' : 'text');
-  const o = textObj('', size, { x: P[0], y: P[1] - size * 0.6, color: note ? '#1f2937' : st.color, font: st.font, bg: note ? '#fef08a' : 'none', lh: note ? LH : st.lh });
+  const o = textObj('', size, { x: P[0], y: P[1] - size * 0.6, color: note ? '#1f2937' : st.color, font: st.font, bg: note ? '#fef08a' : 'none', lh: note ? LH : st.lh, ...(note ? { note: true } : {}) });
   p.objs.push(o); startEdit(p, o, before);
 }
 
@@ -1341,116 +1359,6 @@ function insertImage(url, w, h, opacity = 1) {
   placeObj({ id: uid(), type: 'image', asset: addAsset(url), w, h, opacity }, w, h);
 }
 const textObj = (text, size, extra) => ({ id: uid(), type: 'text', x: 0, y: 0, text, size, color: '#333333', font: 'Helvetica', bold: false, italic: false, underline: false, strike: false, align: 'left', lh: LH, bg: 'none', opacity: 1, ...extra });
-function insertDate() { const o = textObj(new Date().toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }), 12, { color: '#111111' }), b = bbox(o); placeObj(o, b.w, b.h); }
-function makeStamp(text, color, plain) {
-  const k = 3, fs = plain ? 40 : 26, c = document.createElement('canvas'); let x = c.getContext('2d');
-  const font = `800 ${fs * k}px Arial, sans-serif`; x.font = font;
-  c.width = Math.ceil(x.measureText(text).width + (plain ? 8 : 36) * k); c.height = (fs + (plain ? 8 : 22)) * k;
-  x = c.getContext('2d'); x.font = font; x.fillStyle = x.strokeStyle = color; x.textAlign = 'center'; x.textBaseline = 'middle';
-  if (!plain) { x.lineWidth = 3 * k; x.beginPath(); if (x.roundRect) x.roundRect(3 * k, 3 * k, c.width - 6 * k, c.height - 6 * k, 7 * k); else x.rect(3 * k, 3 * k, c.width - 6 * k, c.height - 6 * k); x.stroke(); }
-  x.fillText(text, c.width / 2, c.height / 2 + k);
-  return { url: c.toDataURL('image/png'), w: c.width / k, h: c.height / k };
-}
-function makeWatermark(text, color, size) {
-  const k = 2, font = `bold ${size * k}px Arial, sans-serif`, c = document.createElement('canvas'); let x = c.getContext('2d'); x.font = font;
-  c.width = Math.ceil(x.measureText(text).width + 8 * k); c.height = Math.ceil(size * k * 1.3);
-  x = c.getContext('2d'); x.font = font; x.fillStyle = color; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, c.width / 2, c.height / 2);
-  return { url: c.toDataURL('image/png'), w: c.width / k, h: c.height / k };
-}
-async function watermarkDlg() {
-  const r = await dialog('Add watermark', `
-    <label>Text<input type="text" name="text" value="CONFIDENTIAL" required></label>
-    <div class="row"><label>Size<input type="number" name="size" value="64" min="8" max="300"></label>
-    <label>Angle°<input type="number" name="angle" value="-35" min="-180" max="180"></label>
-    <label>Opacity<input type="number" name="op" value="0.18" min="0.02" max="1" step="0.02"></label></div>
-    <div class="row"><label>Color<input type="color" name="color" value="#dc2626"></label>
-    <label>Apply to<select name="scope"><option value="all">All pages</option><option value="cur">Current page</option></select></label></div>`, { ok: 'Add watermark' });
-  if (!r || !r.text.trim()) return;
-  const wm = makeWatermark(r.text.trim(), r.color, +r.size || 64), asset = addAsset(wm.url), rot = (((+r.angle || 0) % 360) + 360) % 360; pushUndo();
-  for (const p of r.scope === 'all' ? S.pages : [S.pages[S.cur]]) {
-    const f = Math.min(1, Math.hypot(p.w, p.h) * 0.8 / wm.w), w = wm.w * f, h = wm.h * f;
-    p.objs.push({ id: uid(), type: 'image', asset, x: (p.w - w) / 2, y: (p.h - h) / 2, w, h, rot, opacity: clamp(+r.op || 0.18, 0.02, 1) }); drawObjs(p);
-  }
-  toast('Watermark added — select it to move, resize, rotate or delete');
-}
-function stampText(p, o, pos, m) { // pos: [t|b][l|c|r]
-  const b = bbox(o); o.x = pos[1] === 'c' ? (p.w - b.w) / 2 : pos[1] === 'r' ? p.w - m - b.w : m; o.y = pos[0] === 'b' ? p.h - m - b.h : m;
-  o.align = { l: 'left', c: 'center', r: 'right' }[pos[1]]; p.objs.push(o); drawObjs(p);
-}
-async function pageNumDlg() {
-  const r = await dialog('Add page numbers', `
-    <div class="row"><label>Format<select name="fmt"><option value="{n}">1</option><option value="Page {n}">Page 1</option><option value="{n} / {N}">1 / N</option><option value="Page {n} of {N}">Page 1 of N</option><option value="- {n} -">- 1 -</option></select></label>
-    <label>Position<select name="pos"><option value="bc">Bottom center</option><option value="br">Bottom right</option><option value="bl">Bottom left</option><option value="tc">Top center</option><option value="tr">Top right</option><option value="tl">Top left</option></select></label></div>
-    <label>Custom text — overrides Format ({n} = number, {N} = total), e.g. DOC-{n}<input type="text" name="custom" autocomplete="off"></label>
-    <div class="row"><label>Font size<input type="number" name="size" value="10" min="5" max="40"></label>
-    <label>Start at<input type="number" name="start" value="1" min="0"></label>
-    <label>Margin<input type="number" name="m" value="28" min="4" max="200"></label>
-    <label style="flex:0 0 60px">Color<input type="color" name="color" value="#333333"></label></div>
-    <div class="row"><label>Font<select name="font"><option>Helvetica</option><option>Times</option><option>Courier</option></select></label>
-    <label>Only pages (blank = all), e.g. 2-10<input type="text" name="range" autocomplete="off"></label></div>
-    <label class="inl"><input type="checkbox" name="skip1">Skip the first page (cover)</label>
-    <label class="inl"><input type="checkbox" name="replace" checked>Replace page numbers added earlier</label>`, { ok: 'Add numbers' });
-  if (!r) return;
-  let idx = r.range.trim() ? parseRange(r.range, S.pages.length) : S.pages.map((_, i) => i);
-  if (!idx) return toast(`Invalid page range. Use numbers 1–${S.pages.length}, e.g. 2-10`, true);
-  if (r.skip1) idx = idx.filter(i => i > 0);
-  pushUndo();
-  if (r.replace) S.pages.forEach(p => { if (p.objs.some(o => o.pn)) { p.objs = p.objs.filter(o => !o.pn); drawObjs(p); } });
-  const st = Number.isFinite(+r.start) ? +r.start : 1, N = idx.length + st - 1, fmt = r.custom.trim() || r.fmt;
-  idx.forEach((pi, k) => {
-    const text = fmt.replace(/\{n\}/g, k + st).replace(/\{N\}/g, N);
-    stampText(S.pages[pi], textObj(text, +r.size || 10, { color: r.color, font: r.font, pn: true }), r.pos, +r.m || 28);
-  });
-  S.sel = null; drawSel(); toast(`Page numbers added to ${idx.length} page(s)`);
-}
-async function headFootDlg() {
-  const r = await dialog('Header / footer', `
-    <label>Header text<input type="text" name="head" placeholder="e.g. Company name — {date}"></label>
-    <label>Footer text<input type="text" name="foot" placeholder="e.g. Page {page} of {pages}"></label>
-    <div class="row"><label>Align<select name="al"><option value="c">Center</option><option value="l">Left</option><option value="r">Right</option></select></label>
-    <label>Font size<input type="number" name="size" value="10" min="5" max="40"></label>
-    <label>Margin<input type="number" name="m" value="28" min="4" max="200"></label></div>
-    <p style="color:var(--mut)">Placeholders: {page} {pages} {date} {file}</p>`, { ok: 'Add to all pages' });
-  if (!r || (!r.head.trim() && !r.foot.trim())) return; pushUndo();
-  const N = S.pages.length, fill = (t, i) => t.replace(/\{page\}/g, i + 1).replace(/\{pages\}/g, N).replace(/\{date\}/g, new Date().toLocaleDateString()).replace(/\{file\}/g, baseName());
-  S.pages.forEach((p, i) => {
-    if (r.head.trim()) stampText(p, textObj(fill(r.head.trim(), i), +r.size || 10), 't' + r.al, +r.m || 28);
-    if (r.foot.trim()) stampText(p, textObj(fill(r.foot.trim(), i), +r.size || 10), 'b' + r.al, +r.m || 28);
-  });
-  toast('Header / footer added');
-}
-async function signDlg() {
-  let pad; const last = (() => { try { return localStorage.getItem('xd3.sig'); } catch (e) { return null; } })();
-  const r = await dialog('Signature', `
-    <canvas class="sigpad" width="1120" height="400"></canvas>
-    <div class="row"><label>…or type it<input type="text" name="typed" placeholder="Your name" autocomplete="off"></label>
-    <label style="flex:0 0 70px">Ink<input type="color" name="ink" value="#0b2a7a"></label></div>
-    <div class="row"><button type="button" class="btn" data-s="clear" style="border:1px solid var(--line)">Clear</button>
-    ${last ? '<button type="button" class="btn" data-s="last" style="border:1px solid var(--line)">Use last signature</button>' : ''}</div>`, {
-    ok: 'Insert', onOpen: d => {
-      const c = $('.sigpad', d), x = c.getContext('2d'), ink = $('[name=ink]', d), typed = $('[name=typed]', d); let on = false, used = false;
-      const pos = e => { const b = c.getBoundingClientRect(); return [(e.clientX - b.left) * c.width / b.width, (e.clientY - b.top) * c.height / b.height]; };
-      const clear = () => { x.clearRect(0, 0, c.width, c.height); used = false; };
-      c.onpointerdown = e => { on = true; used = true; c.setPointerCapture(e.pointerId); x.strokeStyle = ink.value; x.lineWidth = 5; x.lineCap = x.lineJoin = 'round'; x.beginPath(); x.moveTo(...pos(e)); };
-      c.onpointermove = e => { if (on) { x.lineTo(...pos(e)); x.stroke(); } };
-      c.onpointerup = c.onpointercancel = () => on = false;
-      const type = () => { clear(); if (!typed.value) return; used = true; x.fillStyle = ink.value; x.font = 'italic 150px "Segoe Script", "Brush Script MT", "Lucida Handwriting", cursive'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(typed.value, c.width / 2, c.height / 2, c.width - 40); };
-      typed.oninput = type; ink.oninput = () => { if (typed.value) type(); };
-      $('[data-s=clear]', d).onclick = () => { typed.value = ''; clear(); };
-      const lb = $('[data-s=last]', d); if (lb) lb.onclick = () => { const im = new Image(); im.onload = () => { clear(); used = true; const f = Math.min(c.width / im.width, c.height / im.height, 1); x.drawImage(im, (c.width - im.width * f) / 2, (c.height - im.height * f) / 2, im.width * f, im.height * f); }; im.src = last; };
-      pad = () => { // crop to ink bounds
-        if (!used) return null; const d2 = x.getImageData(0, 0, c.width, c.height).data; let a = c.width, b = c.height, e2 = 0, f = 0;
-        for (let yy = 0; yy < c.height; yy++) for (let xx = 0; xx < c.width; xx++) if (d2[(yy * c.width + xx) * 4 + 3] > 8) { if (xx < a) a = xx; if (xx > e2) e2 = xx; if (yy < b) b = yy; if (yy > f) f = yy; }
-        if (e2 <= a || f <= b) return null; const o = document.createElement('canvas'); o.width = e2 - a + 12; o.height = f - b + 12;
-        o.getContext('2d').drawImage(c, a - 6, b - 6, o.width, o.height, 0, 0, o.width, o.height); return { url: o.toDataURL('image/png'), w: o.width, h: o.height };
-      };
-    }
-  });
-  if (!r) return; const sig = pad(); if (!sig) return toast('Signature is empty', true);
-  try { localStorage.setItem('xd3.sig', sig.url); } catch (e) { /* storage unavailable */ }
-  const w = Math.min(190, sig.w / 3); insertImage(sig.url, w, w * sig.h / sig.w);
-}
-
 /* ───────── page operations ───────── */
 function pageOp(fn) { if (!S.pages.length) return; pushUndo(); fn(); const y = viewer.scrollTop; buildPages(); viewer.scrollTop = y; }
 const rotatePage = (i, d) => pageOp(() => { S.pages[i].rot = (S.pages[i].rot + d + 360) % 360; });
@@ -1529,7 +1437,10 @@ function rasterText(o) {
   for (const l of textLines(o)) { x.font = cssFont(o); x.fillText(l.ln, l.x, l.y); if (l.ln) for (const dy of decoY(o)) x.fillRect(l.x, l.y + o.size * dy - o.size / 32, l.w, Math.max(0.5, o.size / 16)); }
   return { url: c.toDataURL('image/png'), w: c.width / k, h: c.height / k };
 }
-async function buildPdf(pages) {
+const isRedact = o => !!o.cover && (o.redact || o.fill === '#000000');
+const annotMode = () => { try { return localStorage.getItem('xd3.annots') !== 'off'; } catch (e) { return true; } };
+const isAnnot = o => !o.cover && (['ellipse', 'line', 'arrow', 'path'].includes(o.type) || (o.type === 'rect' && (o.blend || (o.color && o.color !== 'none'))) || (o.type === 'text' && o.note && o.text.trim()));
+async function buildPdf(pages, opt = {}) { // opt.redact: 'flatten' (default — pages with blackout boxes become pictures, nothing hidden is left) | 'cover'
   commitEdit();
   const L = PDFLib, out = await L.PDFDocument.create(), docs = {}, copies = new Map(), occ = {}, batches = {};
   for (const p of pages) { if (p.src < 0) continue; const kk = p.src + '|' + p.idx, k = occ[kk] = (occ[kk] || 0) + 1; (batches[p.src + '|' + k] = batches[p.src + '|' + k] || []).push(p); }
@@ -1547,7 +1458,7 @@ async function buildPdf(pages) {
   const simple = cp => cp < 0x0530 || (cp >= 0x1e00 && cp <= 0x22ff); // scripts that need no shaping: Latin, Greek, Cyrillic, punctuation, symbols
   const kitFont = async (key, bytes) => { // an embedded font file → { f, set }, or null when it cannot be embedded (whole file: pdf-lib's subsetter corrupts several faces)
     if (!(key in fonts)) {
-      try { if (!kitReady) { out.registerFontkit(window.fontkit); kitReady = true; } const f = await out.embedFont(await bytes(), { subset: false, features: FEAT_OFF }); fonts[key] = { f, set: new Set(f.getCharacterSet()) }; }
+      try { if (!kitReady) { out.registerFontkit(await loadLib('fontkit')); kitReady = true; } const f = await out.embedFont(await bytes(), { subset: false, features: FEAT_OFF }); fonts[key] = { f, set: new Set(f.getCharacterSet()) }; }
       catch (e) { console.warn('font embed failed', key, e); fonts[key] = null; }
     }
     return fonts[key];
@@ -1602,7 +1513,10 @@ async function buildPdf(pages) {
       });
       return;
     }
-    const hasS = o.color && o.color !== 'none' && o.width > 0, hasF = o.fill && o.fill !== 'none', ops = [L.pushGraphicsState(), ...gs(page, op, o.blend)];
+    page.pushOperators(L.pushGraphicsState(), ...gs(page, op, o.blend), ...shapeOps(o), L.popGraphicsState());
+  }
+  function shapeOps(o) { // the drawing commands of a shape, in page view space (shared by page content and comment appearances)
+    const hasS = o.color && o.color !== 'none' && o.width > 0, hasF = o.fill && o.fill !== 'none', ops = [];
     if (hasS) { ops.push(L.setStrokingRgbColor(...rgb01(o.color)), L.setLineWidth(o.width), L.setLineCap(L.LineCapStyle.Round), L.setLineJoin(L.LineJoinStyle.Round)); const da = dashArr(o); if (da) ops.push(L.setDashPattern(da, 0)); }
     if (hasF) ops.push(L.setFillingRgbColor(...rgb01(o.fill)));
     const paint = () => hasF && hasS ? L.fillAndStroke() : hasF ? L.fill() : hasS ? L.stroke() : L.endPath();
@@ -1625,21 +1539,65 @@ async function buildPdf(pages) {
       ops.push(L.setLineCap(L.LineCapStyle.Butt), L.moveTo(o.x1, o.y1), L.lineTo(ar.bx, ar.by), L.stroke(),
         L.setFillingRgbColor(...rgb01(o.color)), L.moveTo(...h[0]), L.lineTo(...h[1]), L.lineTo(...h[2]), L.closePath(), L.fill());
     }
-    ops.push(L.popGraphicsState()); page.pushOperators(...ops);
+    return ops;
+  }
+  const upt = (M, x, y) => [M[0] * x + M[2] * y + M[4], M[1] * x + M[3] * y + M[5]];
+  function addAnnot(page, o, inv) { // a shape, highlight, pen stroke or sticky note → a real PDF comment (editable in other readers), with its own appearance
+    const N = L.PDFName.of, ctx = out.context, op = o.opacity ?? 1, b = bbox(o), author = L.PDFHexString.fromText(S.meta.author || 'XD3 PDF Editor');
+    let M = inv; if (o.rot && !isLine(o)) { const c = center(b), a = o.rot * Math.PI / 180, cs = Math.cos(a), sn = Math.sin(a); M = T6(inv, [cs, sn, -sn, cs, c[0] - c[0] * cs + c[1] * sn, c[1] - c[0] * sn - c[1] * cs]); }
+    const corners = [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]].map(q => upt(M, q[0], q[1]));
+    const col = h => (h && h !== 'none' ? rgb01(h) : null), common = { Type: 'Annot', F: 4, NM: L.PDFString.of(o.id), T: author, M: L.PDFString.fromDate(new Date()), CA: op, P: page.ref };
+    if (o.type === 'text') { // sticky note → a comment icon that opens the text
+      const [x, y] = upt(inv, o.x, o.y), rect = [x, y - 20, x + 20, y];
+      page.node.addAnnot(ctx.register(ctx.obj({ ...common, Subtype: 'Text', Rect: rect, Contents: L.PDFHexString.fromText(o.text), Name: 'Comment', C: [1, 0.9, 0.35], F: 28, Open: false })));
+      return;
+    }
+    const m = (o.width || 0) / 2 + 2, box = [b.x - m, b.y - m, b.x + b.w + m, b.y + b.h + m], xs = corners.map(q => q[0]), ys = corners.map(q => q[1]);
+    const pad = Math.max(...corners.map(() => m)), rect = [Math.min(...xs) - pad, Math.min(...ys) - pad, Math.max(...xs) + pad, Math.max(...ys) + pad];
+    const res = {}, ops = []; if (op < 1 || o.blend) { res.ExtGState = { GS0: ctx.register(ctx.obj({ Type: 'ExtGState', ca: op, CA: op, ...(o.blend ? { BM: 'Multiply' } : {}) })) }; ops.push(L.setGraphicsState('GS0')); }
+    ops.push(...shapeOps(o));
+    const ap = ctx.register(ctx.stream(ops.map(String).join('\n'), { Type: 'XObject', Subtype: 'Form', BBox: box, Matrix: M, Resources: ctx.obj(res) }));
+    const d = { ...common, Rect: rect, AP: { N: ap }, Border: [0, 0, 0] };
+    if (o.color && o.color !== 'none') d.C = col(o.color); if (o.fill && o.fill !== 'none') d.IC = col(o.fill);
+    if (o.width > 0) d.BS = { W: o.width, S: o.dash && o.dash !== 'solid' ? 'D' : 'S', ...(o.dash && o.dash !== 'solid' ? { D: dashArr(o) } : {}) };
+    if (o.type === 'rect' && o.blend) { // highlight area
+      Object.assign(d, { Subtype: 'Highlight', C: col(o.fill), QuadPoints: [...upt(M, b.x, b.y), ...upt(M, b.x + b.w, b.y), ...upt(M, b.x, b.y + b.h), ...upt(M, b.x + b.w, b.y + b.h)] }); delete d.IC;
+    } else if (o.type === 'rect') d.Subtype = 'Square'; else if (o.type === 'ellipse') d.Subtype = 'Circle';
+    else if (isLine(o)) { Object.assign(d, { Subtype: 'Line', L: [...upt(inv, o.x1, o.y1), ...upt(inv, o.x2, o.y2)] }); if (o.type === 'arrow') { d.LE = ['None', 'ClosedArrow']; d.IC = col(o.color); } }
+    else if (o.type === 'path') { Object.assign(d, { Subtype: 'Ink', InkList: [o.pts.flatMap(q => upt(inv, q[0], q[1]))] }); if (o.blend) d.Contents = L.PDFHexString.fromText('Highlight'); }
+    page.node.addAnnot(ctx.register(ctx.obj(d)));
   }
 
+  const annots = annotMode() && !opt.noAnnots, made = new Map(), X = window.XD3;
   for (const p of pages) {
     let page, inv, total = p.rot;
+    if (opt.redact !== 'cover' && p.objs.some(isRedact)) { // blacked-out page → saved as a picture, so the hidden text really is gone
+      const [rw, rh] = rdims(p), c = await renderPageImage(p, 200 / 72); page = out.addPage([rw, rh]); made.set(p, page);
+      page.drawImage(await out.embedJpg(c.toDataURL('image/jpeg', 0.85)), { x: 0, y: 0, width: rw, height: rh }); continue;
+    }
     if (p.src < 0) { page = out.addPage([p.w, p.h]); inv = [1, 0, 0, -1, 0, p.h]; }
     else {
       page = out.addPage(copies.get(p));
       const pg = await getPdfPage(p), [a, b, c, d, e, f] = pg.getViewport({ scale: 1 }).transform, det = a * d - b * c;
       inv = [d / det, -b / det, -c / det, a / det, (c * f - d * e) / det, (b * e - a * f) / det]; total = (pg.rotate + p.rot) % 360;
     }
-    page.setRotation(L.degrees(total));
+    page.setRotation(L.degrees(total)); made.set(p, page);
+    if (p.filled && p.filled.length && X.hideFields) X.hideFields(page, p); // filled-in form fields: the typed values are page content now
+    if (p.ocr && p.ocr.length) { // recognised text goes in as an invisible layer, so the scan can be searched and copied in any reader
+      const F = await famFont('Helvetica', { bold: false, italic: false });
+      page.pushOperators(L.pushGraphicsState(), L.concatTransformationMatrix(...inv), L.setTextRenderingMode(L.TextRenderingMode.Invisible));
+      for (const it of p.ocr) {
+        if (covered(p, it)) continue; const txt = [...it.str].filter(ch => F.has(ch.codePointAt(0))).join('').trim(); if (!txt) continue;
+        const w = F.font.widthOfTextAtSize(txt, it.size); if (!(w > 0)) continue;
+        page.pushOperators(L.pushGraphicsState(), L.concatTransformationMatrix(1, 0, 0, -1, it.x, it.base), L.setCharacterSqueeze(clamp(it.w / w * 100, 25, 400)));
+        page.drawText(txt, { x: 0, y: 0, size: it.size, font: F.font, color: L.rgb(0, 0, 0) }); page.pushOperators(L.popGraphicsState());
+      }
+      page.pushOperators(L.popGraphicsState());
+    }
     if (!p.objs.length) continue;
     page.pushOperators(L.pushGraphicsState(), L.concatTransformationMatrix(...inv));
     for (const o of p.objs) {
+      if (annots && isAnnot(o)) { try { addAnnot(page, o, inv); continue; } catch (e) { console.warn('comment', e); } }
       const rot = !isLine(o) && o.rot;
       if (rot) { const c = center(bbox(o)), a = rot * Math.PI / 180, cs = Math.cos(a), sn = Math.sin(a); page.pushOperators(L.pushGraphicsState(), L.concatTransformationMatrix(cs, sn, -sn, cs, c[0] - c[0] * cs + c[1] * sn, c[1] - c[0] * sn - c[1] * cs)); }
       await drawOne(page, o);
@@ -1647,6 +1605,7 @@ async function buildPdf(pages) {
     }
     page.pushOperators(L.popGraphicsState());
   }
+  if (X.writeOutline) try { X.writeOutline(out, pages, made); } catch (e) { console.warn('bookmarks', e); }
   const m = S.meta;
   if (m.title) out.setTitle(m.title); if (m.author) out.setAuthor(m.author); if (m.subject) out.setSubject(m.subject);
   if (m.keywords) out.setKeywords(m.keywords.split(',').map(s => s.trim()).filter(Boolean));
@@ -1654,8 +1613,15 @@ async function buildPdf(pages) {
   return out.save();
 }
 async function save() {
+  commitEdit();
+  const nRed = S.pages.filter(p => p.objs.some(isRedact)).length; let redact = 'flatten';
+  if (nRed) {
+    const r = await dialog('Blackout boxes', `<p>${nRed} page(s) have blackout boxes. How should they be saved?</p>
+      <label>Blackout<select name="m"><option value="flatten">Make them permanent — those pages are saved as pictures, nothing hidden is left (recommended)</option><option value="cover">Keep those pages editable — the covered text stays inside the file</option></select></label>`, { ok: 'Save PDF' });
+    if (!r) return; redact = r.m;
+  }
   await busy(async () => {
-    const bytes = await buildPdf(S.pages);
+    const bytes = await buildPdf(S.pages, { redact });
     download(new Blob([bytes], { type: 'application/pdf' }), /-edited$/.test(baseName()) || S.sources.length === 0 ? S.fileName : baseName() + '-edited.pdf');
     S.dirty = false; updateUI(); flash($('#topbar [data-act=save]'), 'flash'); toast('PDF saved to your downloads');
   }, 'Building PDF…');
@@ -1713,8 +1679,7 @@ const ACT = {
   ed_cut: () => document.execCommand('cut'), ed_copy: () => document.execCommand('copy'), ed_paste: edPaste, ed_selall: () => document.execCommand('selectAll'), ed_done: () => commitEdit(),
   pgtop: () => { if (S.cur > 0) { movePage(S.cur, 0); goToPage(0); } }, pgend: () => { const n = S.pages.length - 1; if (S.cur < n) { movePage(S.cur, n); goToPage(n); } },
   merge: () => $('#fMerge').click(), imgpages: () => $('#fImgPages').click(), extract: extractDlg, png: exportPng,
-  image: () => $('#fImg').click(), sign: signDlg, watermark: watermarkDlg, pagenum: pageNumDlg, headfoot: headFootDlg, datestamp: insertDate,
-  stamp: b => { const s = makeStamp(b.dataset.t, b.dataset.c, !!b.dataset.plain); insertImage(s.url, s.w, s.h); },
+  image: () => $('#fImg').click(),
   props: propsDlg, find: toggleFind, findprev: () => stepFind(-1), findnext: () => stepFind(1),
   selall: () => { const p = S.pages[S.cur]; setTool('select'); select(p.id, p.objs.map(o => o.id)); if (!p.objs.length) toast('Nothing to select on this page yet'); }, clearpage: clearPage,
   sidebar: () => { document.body.classList.toggle('nosb'); document.body.classList.toggle('sbopen'); },
@@ -1737,7 +1702,7 @@ const ACT = {
     <p style="color:var(--mut)">Everything runs on your device — no internet connection is needed and your documents are never uploaded. The app is locked down so it can only load its own bundled files.</p>
     <p style="color:var(--mut)">Text in scans and pictures is read on your device by the bundled Tesseract OCR engine (Apache 2.0 licence).</p>
     <p style="color:var(--mut)">Bundled fonts come from Google Fonts under the SIL Open Font, Apache 2.0 and Ubuntu Font licences (see lib/fonts/README.txt).</p>
-    <p style="color:var(--mut)">Note: edited text, picked-up objects, whiteout and blackout cover the original content visually; the original data underneath remains in the file.</p>`),
+    <p style="color:var(--mut)">Note: edited text, picked-up objects and whiteout cover the original content visually; the original data underneath remains in the file. Pages with blackout boxes are saved as pictures, which removes it for good.</p>`),
 };
 document.addEventListener('click', e => {
   const sb = e.target.closest('.hassub'); if (sb) { clearTimeout(subTimer); if (!sb.classList.contains('subopen')) openSub(sb); return; } // a submenu parent keeps the menu open
@@ -1846,5 +1811,5 @@ window.XD3 = { S, PE, ACT, NO_DOC, HINTS, A4, CSS_UNITS, LH, BASE, viewer, $, $$
   pushUndo, snap, resetDoc, scheduleSave, buildPages, layout, drawObjs, drawSel, select, selObjs, selOne, setTool, syncControls, updateUI, goToPage, fitZoom, setZoom,
   bbox, center, rotP, shiftObj, isLine, textLines, measure, baseOff, cssFont, rdims, baseName, parseRange, textObj, placeObj, insertImage, addAsset, readImage, imagePage,
   visible, getPdfPage, addSource, loadSource, openFiles, isPdf, isDocx, getText, getLines, getBlocks, toBlocks, getImages, scanPage, visibleText, covered, fontStyle, origFont, fontLabel, baseCanvas, baseSig, isBaseImg, aabb, hitsRect, hex, editOriginal, coverFor, convertRegion, renderPageImage, buildPdf, pageOp, movePage,
-  rotatePage, dupPage, deletePage, pageNumDlg, runFind, convertTextItem, drawTI, showCtx, mi, pageSub, ensureFont, BUNDLED, FONTS, commitEdit, viewCenter, updateBell, flash };
+  rotatePage, dupPage, deletePage, runFind, loadLib, isRedact, startEdit, r2, convertTextItem, drawTI, showCtx, mi, pageSub, ensureFont, BUNDLED, FONTS, commitEdit, viewCenter, updateBell, flash };
 })();
