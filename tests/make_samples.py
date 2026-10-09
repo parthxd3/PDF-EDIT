@@ -28,6 +28,9 @@ d.text((40, 40), 'Text inside a picture', font=font('Lato-Bold.ttf', 64), fill=(
 c.drawImage(ImageReader(im), 60, 380, width=300, height=100)
 t = c.beginText(60, 330); t.setFont('Times-Roman', 12); t.setWordSpace(6); t.textOut('This line is justified with wide word spacing'); c.drawText(t)
 c.bookmarkPage('top'); c.addOutlineEntry('Invoice', 'top', level=0)
+c.setFillColorRGB(0, 0, 0.8); c.setFont('Helvetica', 11); c.drawString(60, 300, 'Visit the website'); c.linkURL('https://example.com/', (58, 296, 160, 312), relative=0)
+c.drawString(60, 280, 'Go to the second page'); c.linkAbsolute('second page', 'p2', (58, 276, 190, 292))
+c.setFillColorRGB(0, 0, 0)
 c.showPage(); c.setFont('Helvetica', 12); c.drawString(60, 780, 'Second page'); c.bookmarkPage('p2'); c.addOutlineEntry('Second page', 'p2', level=0); c.showPage(); c.save()
 
 # 2. a scan (picture of a page with light noise), 3. the same with a crooked tilt, 4. the same with a hidden OCR text layer

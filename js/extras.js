@@ -168,6 +168,33 @@ async function batchOne(bytes, act, wm) { // one file through the chosen action;
   }
 }
 
+/* ───────── recent files: the last few PDFs opened on this device, for one-click reopening ───────── */
+const RECENT_MAX = 8, RECENT_BYTES = 160e6, RECENT_FILE = 40e6;
+async function noteRecent(files) {
+  try {
+    const f = [...files].find(x => X.isPdf(x)); if (!f || f.size > RECENT_FILE) return;
+    const bytes = new Uint8Array(await f.arrayBuffer()); let list = (await X.DB.get('recent')) || [];
+    list = list.filter(r => r.name !== f.name); list.unshift({ name: f.name, t: Date.now(), bytes });
+    let total = 0; list = list.filter(r => (total += r.bytes.length) <= RECENT_BYTES).slice(0, RECENT_MAX);
+    await X.DB.put('recent', list); renderRecent(list);
+  } catch (e) { /* storage unavailable */ }
+}
+async function renderRecent(list) {
+  const host = $('#recent'); if (!host) return;
+  try { list = list || (await X.DB.get('recent')) || []; } catch (e) { list = []; }
+  host.hidden = !list.length; if (!list.length) return;
+  const ago = t => { const d = Math.round((Date.now() - t) / 60000); return d < 2 ? 'just now' : d < 60 ? d + ' min ago' : d < 1440 ? Math.round(d / 60) + ' h ago' : Math.round(d / 1440) + ' d ago'; };
+  host.innerHTML = '<h3><i data-icon="clock"></i>Recent files</h3>' + list.map((r, i) => `<button class="recent" data-r="${i}" title="Open again"><i data-icon="pages"></i><span>${esc(r.name)}</span><small>${(r.bytes.length / 1048576).toFixed(1)} MB · ${ago(r.t)}</small></button>`).join('') + '<button class="btn line" data-r="clear" style="margin-top:6px">Clear list</button>';
+  icons(host);
+}
+$('#welcome').addEventListener('click', async e => {
+  const b = e.target.closest('[data-r]'); if (!b) return;
+  if (b.dataset.r === 'clear') { await X.DB.put('recent', []); renderRecent([]); return; }
+  const list = (await X.DB.get('recent')) || [], r = list[+b.dataset.r]; if (r) X.openFiles([new File([r.bytes], r.name, { type: 'application/pdf' })], false);
+});
+renderRecent();
+X.noteRecent = noteRecent;
+
 X.NO_DOC.add('batch'); X.NO_DOC.add('annots');
 X.ACT.annots = () => { const on = localStorage.getItem('xd3.annots') === 'off'; try { localStorage.setItem('xd3.annots', on ? 'on' : 'off'); } catch (e) { /* not remembered */ } syncAnnots(); toast(on ? 'Shapes, highlights and notes will be saved as PDF comments' : 'Shapes, highlights and notes will be saved as flat page content'); };
 function syncAnnots() { let on = true; try { on = localStorage.getItem('xd3.annots') !== 'off'; } catch (e) { /* default */ } $$('[data-act=annots]').forEach(b => b.classList.toggle('on', on)); }

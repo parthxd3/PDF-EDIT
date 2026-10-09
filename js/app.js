@@ -98,6 +98,7 @@ const ICONS = {
   selall: 'M4 4h4M4 4v4M20 4h-4M20 4v4M4 20h4M4 20v-4M20 20h-4M20 20v-4M9 12l2 2 4-4', compress: 'M12 3v6M9 6l3 3 3-3M12 21v-6M9 18l3-3 3 3M4 12h16', minus: 'M5 12h14',
   bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0', bolt: 'M13 3L5 13h6l-1 8 8-10h-6z', sun: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5',
   cut: 'M6 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM6 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM8 9l12 8M8 15L20 7', bookmark: 'M6 3h12v18l-6-4-6 4z',
+  book: 'M4 5a2 2 0 0 1 2-2h6v18H6a2 2 0 0 0-2 2zM20 5a2 2 0 0 0-2-2h-6v18h6a2 2 0 0 1 2 2z', expand: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5M9 9l-5-5M15 9l5-5M9 15l-5 5M15 15l5 5', clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 3',
 };
 const HINTS = {
   select: 'Click to select · drag to move · corner handles resize · top handle rotates · Shift+click or drag a box to select several · double‑click text to edit',
@@ -301,6 +302,7 @@ async function openFiles(files, append) {
       setTool('select'); syncControls(); updateUI(); scheduleSave();
     }
     if (append) toast(`Added ${files.length} file(s)`);
+    else { if (window.XD3.noteRecent) window.XD3.noteRecent(files); if (window.XD3.onDocOpened) window.XD3.onDocOpened(); }
   }, 'Opening…');
 }
 function newDoc() {
@@ -318,7 +320,7 @@ function buildPages() {
   viewer.textContent = ''; thumbs.textContent = ''; PE.clear(); visible.clear();
   io = new IntersectionObserver(ens => ens.forEach(en => {
     const id = en.target.dataset.id, p = pageById(id);
-    if (en.isIntersecting) { visible.add(id); const pe = PE.get(id); if (pe) pe.seen = Date.now(); if (p) { renderCanvas(p); drawTI(p); } } else { visible.delete(id); trimCanvases(); }
+    if (en.isIntersecting) { visible.add(id); const pe = PE.get(id); if (pe) pe.seen = Date.now(); if (p) { renderCanvas(p); drawTI(p); if (window.XD3.onPageVisible) window.XD3.onPageVisible(p); } } else { visible.delete(id); trimCanvases(); }
   }), { root: viewer, rootMargin: '600px 0px' });
   tio = new IntersectionObserver(ens => ens.forEach(en => {
     if (!en.isIntersecting) return; tio.unobserve(en.target); const p = pageById(en.target.dataset.id); if (p) renderThumb(p, en.target);
@@ -357,7 +359,7 @@ function layout() {
   const sc = scaleCss();
   for (const p of S.pages) {
     const pe = PE.get(p.id); if (!pe) continue; const [rw, rh] = rdims(p);
-    pe.wrap.style.width = rw * sc + 'px'; pe.wrap.style.height = rh * sc + 'px';
+    pe.wrap.style.width = rw * sc + 'px'; pe.wrap.style.height = rh * sc + 'px'; pe.wrap.style.setProperty('--scale-factor', sc);
     pe.svg.setAttribute('viewBox', `0 0 ${rw} ${rh}`); pe.g.setAttribute('transform', ROT_TF(p));
   }
   drawSel();
@@ -547,7 +549,7 @@ function onDown(e, pid) {
   hideCtx();
   if (e.button !== 0) return;
   if (e.target.closest('.txed')) return;
-  if (S.editing) { commitEdit(); e.preventDefault(); return; }
+  if (S.editing) { commitEdit(); if (!['text', 'note', 'edittext'].includes(S.tool)) { e.preventDefault(); return; } } // with a text tool, the click also places / opens the next box
   const p = pageById(pid), pe = PE.get(pid), P = toPt(e, pe), tool = S.tool;
   const oe = e.target.closest('[data-id]'), hit = oe && p.objs.find(x => x.id === oe.dataset.id);
   if (tool === 'hand') drag = { kind: 'pan', cx: e.clientX, cy: e.clientY, st: viewer.scrollTop, sl: viewer.scrollLeft };
@@ -1275,6 +1277,7 @@ const appMenu = () => S.pages.length ? [
   mi('Open…', 'folder', 'open', { key: 'Ctrl+O' }), mi('Add files…', 'merge', 'merge'), mi('Save PDF', 'download', 'save', { key: 'Ctrl+S' }), mi('Print…', 'print', 'print', { key: 'Ctrl+P' }), '-', ...editItems(), '-',
   { label: 'Insert', icon: 'plus', sub: insertSub() }, { label: 'Tools', icon: 'cursor', sub: toolsSub() }, { label: 'This page', icon: 'pages', sub: pageSub() }, mi('Organize pages…', 'grid', 'organize', { key: 'G' }),
   { label: 'Zoom & view', icon: 'zoomin', sub: zoomSub() }, { label: 'Convert & protect', icon: 'word', sub: convertSub() }, '-',
+  mi('Reading mode', 'book', 'reader', { checked: document.body.classList.contains('reader') }), mi('Night colours', 'moon', 'night', { checked: document.body.classList.contains('night') }), mi('Full screen', 'expand', 'fullscreen'), '-',
   mi('Document properties…', 'info', 'props'), mi('Keyboard shortcuts', 'key', 'shortcuts'), mi('About', 'info', 'about'),
 ] : [
   mi('Open file…', 'folder', 'open', { key: 'Ctrl+O' }), mi('Merge files…', 'merge', 'mergedlg'), mi('Scan document…', 'scan', 'scan'), mi('Word → PDF…', 'word', 'docx2pdf'), mi('New blank PDF', 'plus', 'newdoc'),
@@ -1695,7 +1698,7 @@ const ACT = {
     ['Ctrl + / −  ·  Ctrl+wheel', 'Zoom'], ['V E B T', 'Select · Edit text (also in scans and pictures) · Edit object · Add text'], ['P M H N', 'Pen · Highlighter · Highlight area · Note'],
     ['R O L A W', 'Rectangle · Ellipse · Line · Arrow · Whiteout'], ['Del', 'Delete selection'], ['Ctrl+A', 'Select everything on the page'], ['Ctrl+D', 'Duplicate selection'],
     ['Ctrl+C / Ctrl+V', 'Copy / paste objects (or paste an image)'], ['Ctrl+B / I / U', 'Bold · italic · underline'], ['Arrows', 'Nudge selection (Shift = ×10)'],
-    ['Shift+drag', 'Square / 45° lines / 15° rotation / free image resize'], ['Shift+click', 'Add to selection'], ['Double‑click', 'Edit a text box, or open the image editor'], ['Right‑click', 'Menu for the object, page or thumbnail'],
+    ['Esc', 'Leave reading mode · deselect'], ['← → Home End', 'Change page (reading mode)'], ['Shift+drag', 'Square / 45° lines / 15° rotation / free image resize'], ['Shift+click', 'Add to selection'], ['Double‑click', 'Edit a text box, or open the image editor'], ['Right‑click', 'Menu for the object, page or thumbnail'],
   ].map(([k, v]) => `<kbd>${k}</kbd><span>${v}</span>`).join('')}</div>`),
   about: () => dialog('XD3 PDF Editor', `<p><b>A free, private, offline PDF editor.</b></p>
     <p>Built by <b>XD3Labs</b> — a product of <b>XDCybertech Pvt Ltd</b>.</p>
@@ -1811,5 +1814,5 @@ window.XD3 = { S, PE, ACT, NO_DOC, HINTS, A4, CSS_UNITS, LH, BASE, viewer, $, $$
   pushUndo, snap, resetDoc, scheduleSave, buildPages, layout, drawObjs, drawSel, select, selObjs, selOne, setTool, syncControls, updateUI, goToPage, fitZoom, setZoom,
   bbox, center, rotP, shiftObj, isLine, textLines, measure, baseOff, cssFont, rdims, baseName, parseRange, textObj, placeObj, insertImage, addAsset, readImage, imagePage,
   visible, getPdfPage, addSource, loadSource, openFiles, isPdf, isDocx, getText, getLines, getBlocks, toBlocks, getImages, scanPage, visibleText, covered, fontStyle, origFont, fontLabel, baseCanvas, baseSig, isBaseImg, aabb, hitsRect, hex, editOriginal, coverFor, convertRegion, renderPageImage, buildPdf, pageOp, movePage,
-  rotatePage, dupPage, deletePage, runFind, loadLib, isRedact, startEdit, r2, convertTextItem, drawTI, showCtx, mi, pageSub, ensureFont, BUNDLED, FONTS, commitEdit, viewCenter, updateBell, flash };
+  rotatePage, dupPage, deletePage, runFind, loadLib, isRedact, startEdit, r2, DB, convertTextItem, drawTI, showCtx, mi, pageSub, ensureFont, BUNDLED, FONTS, commitEdit, viewCenter, updateBell, flash };
 })();

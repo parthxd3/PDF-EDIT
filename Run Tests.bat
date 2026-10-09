@@ -16,4 +16,4 @@ if not exist "tests\samples\native.pdf" (
 echo Opening the editor with the self-test at http://localhost:%PORT%/index.html?selftest=1
 echo A dialog lists every check; details are also in the browser console (F12). Close this window when you are done.
 start "" "http://localhost:%PORT%/index.html?selftest=1"
-python -m http.server %PORT% --bind 127.0.0.1
+python serve.py %PORT%

@@ -8,7 +8,7 @@ if %errorlevel%==0 (
   echo Starting XD3 PDF Editor at http://localhost:%PORT%
   echo Keep this window open while using the editor. Close it to stop.
   start "" "http://localhost:%PORT%"
-  python -m http.server %PORT% --bind 127.0.0.1
+  python serve.py %PORT%
   goto :eof
 )
 

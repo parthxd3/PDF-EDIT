@@ -63,9 +63,23 @@ async function run() {
   pdf = await reopen(await X.buildPdf(S.pages)); const left = (await (await pdf.getPage(1)).getAnnotations()).filter(a => a.subtype === 'Widget').length;
   ok('form: filled widgets removed on save', left === 2, left);
 
+  // ── reading mode: selectable text, links, highlight from a selection; Add text: click, type, click again ──
+  p = await load('native.pdf'); X.setZoom(1); if (!document.body.classList.contains('reader')) X.ACT.reader(); await sleep(1200);
+  let pe = X.PE.get(p.id), tl = pe.wrap.querySelector('.textLayer');
+  ok('reader: text layer rendered', tl && tl.querySelectorAll('span').length > 20, tl && tl.querySelectorAll('span').length);
+  ok('reader: links placed', pe.wrap.querySelectorAll('.plink').length === 2, pe.wrap.querySelectorAll('.plink').length);
+  if (tl) { X.goToPage(0); const sp = [...tl.querySelectorAll('span')].find(s => /quick brown/.test(s.textContent)), rg = document.createRange(); rg.selectNodeContents(sp); getSelection().removeAllRanges(); getSelection().addRange(rg); await sleep(400);
+    ok('reader: selection pop-up', !document.getElementById('selpop').hidden); document.querySelector('#selpop [data-p=hl]').click(); await sleep(100);
+    const hl = p.objs.find(o => o.blend); ok('reader: highlight from selection', hl && Math.abs(hl.x - 60) < 4 && hl.w > 280, hl && `${hl.x.toFixed(1)} ${hl.w.toFixed(1)}`); }
+  X.ACT.reader(); ok('reader: back to editing', !document.body.classList.contains('reader') && S.tool === 'select');
+  X.setTool('text'); pe = X.PE.get(p.id); const down = (x, y) => { const r = pe.svg.getBoundingClientRect(); pe.svg.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, clientX: r.left + x, clientY: r.top + y })); };
+  down(200, 600); await sleep(50); document.execCommand('insertText', false, 'First box'); down(200, 650); await sleep(50); document.execCommand('insertText', false, 'Second box'); X.commitEdit();
+  const boxes = p.objs.filter(o => o.type === 'text' && /box$/.test(o.text)).map(o => o.text);
+  ok('add text: a click while typing finishes the box and starts the next', boxes.length === 2 && boxes[1] === 'Second box', boxes.join(','));
+
   // ── session round trip ──
   await X.openFiles; S.dirty = true; X.scheduleSave(); await sleep(1800); await X.ACT.restore(); await sleep(300);
-  ok('session: restored with edits', S.pages.length === 1 && S.pages[0].objs.length >= 2, S.pages[0] && S.pages[0].objs.length);
+  ok('session: restored with edits', S.pages.length === 2 && S.pages[0].objs.some(o => o.text === 'Second box'), S.pages[0] && S.pages[0].objs.length);
 }
 window.__selftest = run().catch(e => { ok('suite crashed', false, e && e.stack || e); }).then(() => {
   const fails = results.filter(r => !r.ok), secs = ((performance.now() - t0) / 1000).toFixed(1);

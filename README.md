@@ -18,12 +18,13 @@ web app, or as a Windows program — and nothing is ever uploaded.
 - **Convert** — PDF ⇄ Word, PDF → images, images → PDF, text export; compress; split; compare two versions; batch processing.
 - **Protect** — AES password protection, permanent redaction (flatten).
 - **Insert** — images, signatures (drawn or typed), stamps, dates, watermarks; scan with the camera.
+- **Read** — a reading mode with selectable text, clickable links, bookmarks in the side panel, night colours and full screen; select text to highlight, comment or copy it. Recently opened files are one click away on the start screen.
 
 ## Running it
 
 | How | Steps |
 | --- | --- |
-| On your PC (browser) | Double-click `Start PDF Editor.bat` (needs Python or Node.js) and the editor opens at `http://localhost:5391`. |
+| On your PC (browser) | Double-click `Start PDF Editor.bat` (needs Python or Node.js) and the editor opens at `http://localhost:5391` (served by `serve.py`, which never lets the browser keep a stale copy). |
 | Windows program | `Build EXE.bat` builds a portable app for Windows 7 / 8 / 10 / 11 into `dist\`. |
 | Website (Hostinger or any Apache / LiteSpeed host) | `Build Hostinger ZIP.bat` makes `dist\xd3-pdf-editor-hostinger.zip`; upload and extract it into `public_html`. The site works offline after the first visit and can be installed like an app. |
 
@@ -44,6 +45,7 @@ js/forms.js           form filling          js/extras.js   searchable PDF, bookm
 js/insert.js          stamps, watermark, page numbers, signature
 js/imaging.js         image filters, background remover, scanner
 js/convert.js         Word ⇄ PDF, images, compress, flatten        js/secure.js   password protection
+js/reader.js          reading mode (text layer, links, bookmarks panel, night, selection pop-up)
 js/organize.js        page organizer        js/ui.js       theme, notifications, command palette, service worker
 lib/                  pdf.js, pdf-lib, fontkit, JSZip, fonts, OCR engine + language data (all bundled, no CDN)
 desktop/              Electron shell for the Windows build
