@@ -69,6 +69,7 @@ const OPS = {
   left: () => need() && idxs()[0] > 0 && apply(() => idxs().forEach(i => { const [p] = S.pages.splice(i, 1); S.pages.splice(i - 1, 0, p); })),
   right: () => need() && idxs().pop() < S.pages.length - 1 && apply(() => idxs().reverse().forEach(i => { const [p] = S.pages.splice(i, 1); S.pages.splice(i + 1, 0, p); })),
   reverse: () => apply(() => S.pages.reverse()),
+  moveto: async () => { if (need()) { await X.movePageDlg(idxs()); render(); } },
   blank: () => apply(() => { const at = sel.size ? idxs().pop() + 1 : S.pages.length, ref = S.pages[Math.max(0, at - 1)], [w, h] = ref ? X.rdims(ref) : X.A4; S.pages.splice(at, 0, { id: uid(), src: -1, w, h, rot: 0, objs: [] }); }),
   extract: () => need() && busy(async () => download(new Blob([await X.buildPdf(idxs().map(i => S.pages[i]))], { type: 'application/pdf' }), `${X.baseName()}-pages.pdf`), 'Extracting…'),
   add: async () => { const files = await pick(ACCEPT, true); if (!files.length) return; await busy(async () => { const np = await pagesFrom(files); apply(() => S.pages.splice(sel.size ? idxs().pop() + 1 : S.pages.length, 0, ...np)); toast(`${np.length} page(s) added`); }, 'Adding pages…'); },

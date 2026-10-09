@@ -78,7 +78,7 @@ async function run() {
   ok('add text: a click while typing finishes the box and starts the next', boxes.length === 2 && boxes[1] === 'Second box', boxes.join(','));
 
   // ── session round trip ──
-  await X.openFiles; S.dirty = true; X.scheduleSave(); await sleep(1800); await X.ACT.restore(); await sleep(300);
+  await X.openFiles; S.dirty = true; X.scheduleSave(); await sleep(7000); await X.ACT.restore(); await sleep(300);
   ok('session: restored with edits', S.pages.length === 2 && S.pages[0].objs.some(o => o.text === 'Second box'), S.pages[0] && S.pages[0].objs.length);
 }
 window.__selftest = run().catch(e => { ok('suite crashed', false, e && e.stack || e); }).then(() => {

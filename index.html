@@ -93,7 +93,10 @@
     </div>
 
     <div class="pane" data-pane="pages">
-      <button class="tool wide" data-act="organize" title="Organize pages (G) — reorder, delete, replace, extract"><i data-icon="grid"></i><span>Organize</span></button>
+      <button class="tool wide" data-act="organize" title="Rearrange pages (G) — drag pages into a new order, rotate, delete, replace, extract"><i data-icon="grid"></i><span>Rearrange pages</span></button>
+      <button class="tool" data-act="pgup" title="Move this page up (Ctrl+Shift+↑)"><i data-icon="up"></i></button>
+      <button class="tool" data-act="pgdown" title="Move this page down (Ctrl+Shift+↓)"><i data-icon="down"></i></button>
+      <button class="tool wide" data-act="moveto" title="Move this page to a position"><i data-icon="swap"></i><span>Move to…</span></button>
       <button class="tool wide" data-act="mergedlg" title="Merge PDF, Word and image files in the order you choose"><i data-icon="merge"></i><span>Merge files</span></button>
       <span class="sep"></span>
       <button class="tool wide" data-act="blank" title="Insert a blank page after this one"><i data-icon="plus"></i><span>Blank</span></button>
@@ -209,7 +212,7 @@
       <div class="feats">
         <div><i data-icon="edittext"></i><b>Edit text</b><span>Rewrite any text in its original font — even in scans and pictures (offline OCR) — fill in forms, find &amp; replace</span></div>
         <div><i data-icon="editobj"></i><b>Edit objects</b><span>Move, resize, rotate, align or delete anything on the page</span></div>
-        <div><i data-icon="merge"></i><b>Merge &amp; organize</b><span>Combine PDF, Word and images; reorder, replace, resize, number</span></div>
+        <div><i data-icon="merge"></i><b>Merge &amp; rearrange</b><span>Combine PDF, Word and images; drag pages into order, replace, resize, number</span></div>
         <div><i data-icon="word"></i><b>Convert</b><span>PDF ⇄ Word, PDF → images, images → PDF, export text</span></div>
         <div><i data-icon="compress"></i><b>Compress</b><span>Shrink PDFs while keeping text selectable</span></div>
         <div><i data-icon="lock"></i><b>Protect</b><span>Password-protect with AES encryption, permanent redaction</span></div>
@@ -257,6 +260,7 @@
     <button class="btn line" data-o="extract" title="Save selected pages as a new PDF">Extract</button>
     <button class="btn line" data-o="blank">+ Blank</button>
     <button class="btn line" data-o="add" title="Insert PDF, Word or image files">+ Files…</button>
+    <button class="btn line" data-o="moveto" title="Move the selected pages to a position">Move to…</button>
     <button class="btn line" data-o="reverse">Reverse</button>
     <button class="btn line" data-o="resize">Page size…</button>
     <button class="btn line" data-o="numbers">Numbers…</button>

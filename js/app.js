@@ -197,24 +197,27 @@ const DB = {
   get: k => DB.tx('readonly', s => s.get(k)), put: (k, v) => DB.tx('readwrite', s => s.put(v, k)),
 };
 let savedSrcVer = -1;
-function scheduleSave() { clearTimeout(scheduleSave.t); scheduleSave.t = setTimeout(saveSession, 1500); }
+function scheduleSave() { clearTimeout(scheduleSave.t); scheduleSave.t = setTimeout(() => window.requestIdleCallback ? requestIdleCallback(saveSession, { timeout: 2500 }) : setTimeout(saveSession, 300), 3000); }
+let savedPages = '', savedAssets = -1;
 async function saveSession() {
   try {
     if (!S.pages.length || S.sources.reduce((a, s) => a + s.bytes.length, 0) > 2e8) return;
     if (savedSrcVer !== S.srcVer) { await DB.put('src', S.sources.map(s => s.bytes)); savedSrcVer = S.srcVer; }
     const used = new Set(), xf = {}; for (const p of S.pages) for (const o of p.objs) if (o.type === 'text') used.add(o.font);
     for (const id in S.xfonts) if (used.has(id)) xf[id] = S.xfonts[id];
-    await DB.put('session', { fileName: S.fileName, meta: S.meta, pages: S.pages, assets: S.assets, xfonts: xf, outline: S.outline, n: S.sources.length });
+    const ses = { fileName: S.fileName, meta: S.meta, pages: S.pages, outline: S.outline, n: S.sources.length }, sig = JSON.stringify(ses);
+    if (savedAssets !== S.assetVer) { await DB.put('assets', S.assets); savedAssets = S.assetVer; }
+    if (sig !== savedPages) { await DB.put('session', { ...ses, xfonts: xf }); savedPages = sig; }
   } catch (e) { /* storage unavailable — autosave is best-effort */ }
 }
 async function restoreSession() {
   await busy(async () => {
-    const ses = await DB.get('session'), srcs = await DB.get('src') || [];
+    const ses = await DB.get('session'), srcs = await DB.get('src') || [], assets = await DB.get('assets');
     if (!ses || !ses.pages || srcs.length < ses.n) throw new Error('No saved session found');
     resetDoc();
     for (const b of srcs.slice(0, ses.n)) await addSource(b);
     savedSrcVer = S.srcVer;
-    Object.assign(S, { pages: ses.pages, assets: ses.assets || {}, xfonts: ses.xfonts || {}, outline: ses.outline || [], fileName: ses.fileName || 'document.pdf', meta: ses.meta || {}, dirty: true });
+    Object.assign(S, { pages: ses.pages, assets: assets || ses.assets || {}, xfonts: ses.xfonts || {}, outline: ses.outline || [], fileName: ses.fileName || 'document.pdf', meta: ses.meta || {}, dirty: true });
     buildPages(); S.zoom = clamp(fitZoom(), 0.25, 1.25); layout(); syncControls(); updateUI(); toast('Session restored');
   }, 'Restoring…');
 }
@@ -234,7 +237,7 @@ function redo() { if (!S.redo.length) return; const s = snap(); const r = S.redo
 /* ───────── loading ───────── */
 function resetDoc() {
   commitEdit();
-  Object.assign(S, { sources: [], pages: [], assets: {}, xfonts: {}, outline: [], undo: [], redo: [], sel: null, cur: 0, meta: {}, dirty: false, find: { q: '', hits: [], cur: -1 } });
+  Object.assign(S, { sources: [], pages: [], assets: {}, assetVer: (S.assetVer || 0) + 1, xfonts: {}, outline: [], undo: [], redo: [], sel: null, cur: 0, meta: {}, dirty: false, find: { q: '', hits: [], cur: -1 } });
   S.srcVer++;
 }
 async function addSource(bytes) {
@@ -248,9 +251,9 @@ async function addSource(bytes) {
 }
 async function loadSource(bytes) {
   const si = await addSource(bytes), pdf = S.sources[si].pdf, pages = [];
-  for (let i = 0; i < pdf.numPages; i++) {
-    const vp = (await pdf.getPage(i + 1)).getViewport({ scale: 1 });
-    pages.push({ id: uid(), src: si, idx: i, w: vp.width, h: vp.height, rot: 0, objs: [] });
+  for (let i = 0; i < pdf.numPages; i += 50) { // in batches, so a very long file neither waits on one page at a time nor floods the worker
+    const vps = await Promise.all(Array.from({ length: Math.min(50, pdf.numPages - i) }, (_, k) => pdf.getPage(i + k + 1).then(pg => pg.getViewport({ scale: 1 }))));
+    vps.forEach((vp, k) => pages.push({ id: uid(), src: si, idx: i + k, w: vp.width, h: vp.height, rot: 0, objs: [] }));
   }
   return pages;
 }
@@ -274,7 +277,7 @@ function readImage(file) {
     fr.readAsDataURL(file);
   });
 }
-function addAsset(url) { const id = 'a' + uid(); S.assets[id] = url; return id; }
+function addAsset(url) { const id = 'a' + uid(); S.assets[id] = url; S.assetVer = (S.assetVer || 0) + 1; return id; }
 function imagePage(im) {
   let w = im.w * 0.75, h = im.h * 0.75; const f = Math.min(1, A4[0] / w, A4[1] / h); w *= f; h *= f;
   return { id: uid(), src: -1, w, h, rot: 0, objs: [{ id: uid(), type: 'image', asset: addAsset(im.url), x: 0, y: 0, w, h, opacity: 1 }] };
@@ -624,13 +627,20 @@ function onMove(e) {
       o.x = dx < 0 ? start[0] - w : start[0]; o.y = dy < 0 ? start[1] - h : start[1]; o.w = w; o.h = h;
     }
   }
-  if (!drag.raf) { const d = drag; d.raf = requestAnimationFrame(() => { d.raf = 0; drawObjs(d.p); }); } // at most one redraw per frame while dragging
+  if (!drag.raf) { const d = drag; d.raf = requestAnimationFrame(() => { d.raf = 0; if (d.kind === 'move') slideMoved(d); else drawObjs(d.p); }); } // at most one redraw per frame while dragging
+}
+function slideMoved(d) { // while objects are dragged, their drawings are shifted as a whole (cheap even for big pictures); the page is redrawn once on release
+  const pe = PE.get(d.p.id); if (!pe) return;
+  d.os.forEach((o, i) => { const src = d.srcs[i], el = pe.gObjs.querySelector(`[data-id="${o.id}"]`); if (!el) return;
+    const dx = isLine(o) ? o.x1 - src.x1 : o.type === 'path' ? o.pts[0][0] - src.pts[0][0] : o.x - src.x, dy = isLine(o) ? o.y1 - src.y1 : o.type === 'path' ? o.pts[0][1] - src.pts[0][1] : o.y - src.y;
+    el.setAttribute('transform', `translate(${r2(dx)} ${r2(dy)}) ${rotTf(src)}`); });
+  drawSel();
 }
 const hitsRect = (b, r) => b.x < r.x + r.w && b.x + b.w > r.x && b.y < r.y + r.h && b.y + b.h > r.y;
 function onUp() {
   window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onUp);
   const d = drag; drag = null; if (!d) return;
-  if (d.raf) { cancelAnimationFrame(d.raf); drawObjs(d.p); }
+  if (d.raf) cancelAnimationFrame(d.raf); if (d.raf || d.kind === 'move') drawObjs(d.p);
   if (d.el) d.el.remove();
   if (d.kind === 'marq' || d.kind === 'region') {
     const P = d.last || d.start, r = { x: Math.min(d.start[0], P[0]), y: Math.min(d.start[1], P[1]), w: Math.abs(P[0] - d.start[0]), h: Math.abs(P[1] - d.start[1]) };
@@ -777,6 +787,7 @@ async function drawTI(p) {
     items.forEach((it, i) => { const a = { x: it.x - 1, y: it.y, width: it.w + 2, height: it.h, class: it.field ? 'ti form' : it.ocr ? 'ti ocr' : 'ti', 'data-ti': i }; if (it.rot) a.transform = `rotate(${it.rot} ${r2(it.x + it.w / 2)} ${r2(it.y + it.h / 2)})`; svg('rect', a, pe.gTI); });
   };
   const nat = [...(para ? await getBlocks(p) : await getText(p)), ...(window.XD3.formItems ? await window.XD3.formItems(p) : [])]; if (stale()) return; paint(nat);
+  await new Promise(r => setTimeout(r, 350)); if (stale() || !visible.has(p.id)) return; // only pages that stay in view are read
   const oc = await ocrOf(p).catch(() => []); if (stale() || !oc.length) return; // text inside pictures and scans arrives a little later
   paint([...nat, ...(para ? toBlocks(oc) : oc)]);
 }
@@ -1230,7 +1241,7 @@ const insertSub = () => [mi('Image…', 'image', 'image'), mi('Signature…', 's
   mi('Scan document…', 'scan', 'scan'), mi('Add files (PDF, Word, images)…', 'merge', 'merge'), mi('Blank page', 'plus', 'blank')];
 const pageSub = () => { const n = S.pages.length, p = S.pages[S.cur]; return [
   mi('Rotate right', 'rotate', 'rotr'), mi('Rotate left', 'rotatel', 'rotl'), mi('Duplicate', 'copy', 'dup'), mi('Insert blank page after', 'plus', 'blank'), mi('Replace with another file…', 'swap', 'replacepage'), '-',
-  mi('Move up', 'up', 'pgup', { disabled: S.cur === 0 }), mi('Move down', 'down', 'pgdown', { disabled: S.cur >= n - 1 }), mi('Move to start', 'front', 'pgtop', { disabled: S.cur === 0 }), mi('Move to end', 'back', 'pgend', { disabled: S.cur >= n - 1 }), '-',
+  mi('Move up', 'up', 'pgup', { disabled: S.cur === 0, key: 'Ctrl+Shift+↑' }), mi('Move down', 'down', 'pgdown', { disabled: S.cur >= n - 1, key: 'Ctrl+Shift+↓' }), mi('Move to position…', 'swap', 'moveto', { disabled: n < 2 }), mi('Move to start', 'front', 'pgtop', { disabled: S.cur === 0 }), mi('Move to end', 'back', 'pgend', { disabled: S.cur >= n - 1 }), '-',
   mi('Extract…', 'split', 'extract'), mi('Change size…', 'fit', 'resize'), mi('Add page numbers…', 'hash', 'pagenum'), mi('Bookmarks…', 'bookmark', 'bookmarks'), mi('Export as PNG', 'image', 'png'), '-',
   mi('Remove all edits on page', 'eraser', 'clearpage', { disabled: !p || !p.objs.length }), mi('Delete page', 'trash', 'delpage', { danger: 1, disabled: n < 2 })]; };
 const zoomSub = () => [mi('Zoom in', 'zoomin', 'zoomin', { key: 'Ctrl +' }), mi('Zoom out', 'zoomout', 'zoomout', { key: 'Ctrl −' }), mi('Actual size (100%)', '', 'zoomreset', { key: 'Ctrl+0' }), mi('Fit width', 'fit', 'fit'), mi('Fit whole page', 'pages', 'fitpage'), '-',
@@ -1369,6 +1380,14 @@ const dupPage = i => pageOp(() => { const n = clone(S.pages[i]); n.id = uid(); n
 function deletePage(i) { if (S.pages.length < 2) return toast('A document needs at least one page', true); pageOp(() => S.pages.splice(i, 1)); }
 function addBlank() { const c = S.pages[S.cur], [w, h] = c ? rdims(c) : A4; pageOp(() => S.pages.splice(S.cur + 1, 0, { id: uid(), src: -1, w, h, rot: 0, objs: [] })); goToPage(S.cur + 1); }
 function movePage(from, to) { if (from === to || from < 0) return; pageOp(() => { const [p] = S.pages.splice(from, 1); S.pages.splice(to, 0, p); }); }
+async function movePageDlg(ix) { // ix: page indexes to move (default: the current page) → asked for the new position
+  ix = ix && ix.length ? ix : [S.cur]; const n = S.pages.length; if (n < 2) return toast('This document has only one page');
+  const r = await dialog(ix.length > 1 ? `Move ${ix.length} pages` : `Move page ${ix[0] + 1}`, `<label>New position (1–${n})<input type="number" name="to" min="1" max="${n}" value="${ix[0] + 1}" required autofocus></label>
+    <p class="mut">You can also drag pages in the side panel or in Organize, or press Ctrl+Shift+↑ / ↓.</p>`, { ok: 'Move' });
+  if (!r) return; const to = clamp((+r.to || 1) - 1, 0, n - 1);
+  pageOp(() => { const moving = ix.map(i => S.pages[i]), rest = S.pages.filter(p => !moving.includes(p)), at = clamp(to, 0, rest.length); rest.splice(at, 0, ...moving); S.pages.splice(0, n, ...rest); });
+  goToPage(to); toast(`Moved to position ${to + 1}`);
+}
 function clearPage() { const p = S.pages[S.cur]; if (!p || !p.objs.length) return toast('No edits on this page'); pushUndo(); p.objs = []; S.sel = null; drawObjs(p); drawSel(); updateUI(); toast('Edits removed (Ctrl+Z to undo)'); }
 function parseRange(str, n) {
   const out = [];
@@ -1690,12 +1709,12 @@ const ACT = {
   del: delSel, osdup: dupSel, copy: copySel, cut: () => { copySel(); delSel(); }, paste: () => pasteClip(), pastehere: () => pasteClip(S.ctxPt), front: () => reorder(true), back: () => reorder(false),
   align: b => alignSel(b.dataset.m), distribute: b => distributeSel(b.dataset.m), copystyle: copyStyle, pastestyle: pasteStyle,
   texthere: () => newTextAt(false), notehere: () => newTextAt(true), tool: b => setTool(b.dataset.t),
-  pgup: () => { if (S.cur > 0) { movePage(S.cur, S.cur - 1); goToPage(S.cur - 1); } }, pgdown: () => { if (S.cur < S.pages.length - 1) { movePage(S.cur, S.cur + 1); goToPage(S.cur + 1); } },
+  pgup: () => { if (S.cur > 0) { movePage(S.cur, S.cur - 1); goToPage(S.cur - 1); } }, pgdown: () => { if (S.cur < S.pages.length - 1) { movePage(S.cur, S.cur + 1); goToPage(S.cur + 1); } }, moveto: () => movePageDlg(),
   findrep: () => { toggleFind(true); $('#replInput').focus(); }, repl1: replaceOne, replall: replaceAll, docx2pdf: () => $('#fDocx').click(),
   edittxt: () => { const s = selOne(); if (s && s.o.type === 'text') startEdit(s.p, s.o, snap()); },
   shortcuts: () => dialog('Keyboard shortcuts', `<div class="keys">${[
     ['Ctrl+O / Ctrl+S / Ctrl+P', 'Open · Save · Print'], ['Ctrl+Z / Ctrl+Y', 'Undo / redo'], ['Ctrl+F / Ctrl+H', 'Find · Find & replace'], ['G', 'Organize pages'], ['Ctrl+X', 'Cut selection'],
-    ['Ctrl + / −  ·  Ctrl+wheel', 'Zoom'], ['V E B T', 'Select · Edit text (also in scans and pictures) · Edit object · Add text'], ['P M H N', 'Pen · Highlighter · Highlight area · Note'],
+    ['Ctrl+Shift+↑ / ↓', 'Move the current page up / down'], ['Ctrl + / −  ·  Ctrl+wheel', 'Zoom'], ['V E B T', 'Select · Edit text (also in scans and pictures) · Edit object · Add text'], ['P M H N', 'Pen · Highlighter · Highlight area · Note'],
     ['R O L A W', 'Rectangle · Ellipse · Line · Arrow · Whiteout'], ['Del', 'Delete selection'], ['Ctrl+A', 'Select everything on the page'], ['Ctrl+D', 'Duplicate selection'],
     ['Ctrl+C / Ctrl+V', 'Copy / paste objects (or paste an image)'], ['Ctrl+B / I / U', 'Bold · italic · underline'], ['Arrows', 'Nudge selection (Shift = ×10)'],
     ['Esc', 'Leave reading mode · deselect'], ['← → Home End', 'Change page (reading mode)'], ['Shift+drag', 'Square / 45° lines / 15° rotation / free image resize'], ['Shift+click', 'Add to selection'], ['Double‑click', 'Edit a text box, or open the image editor'], ['Right‑click', 'Menu for the object, page or thumbnail'],
@@ -1788,6 +1807,7 @@ window.addEventListener('keydown', e => {
     else if (k === '=' || k === '+') { e.preventDefault(); setZoom(S.zoom * 1.2); }
     else if (k === '-') { e.preventDefault(); setZoom(S.zoom / 1.2); }
     else if (k === '0') { e.preventDefault(); setZoom(1); }
+    else if (e.shiftKey && (k === 'arrowup' || k === 'arrowdown')) { e.preventDefault(); ACT[k === 'arrowup' ? 'pgup' : 'pgdown'](); }
     return;
   }
   if (typing || !S.pages.length) return;
@@ -1814,5 +1834,5 @@ window.XD3 = { S, PE, ACT, NO_DOC, HINTS, A4, CSS_UNITS, LH, BASE, viewer, $, $$
   pushUndo, snap, resetDoc, scheduleSave, buildPages, layout, drawObjs, drawSel, select, selObjs, selOne, setTool, syncControls, updateUI, goToPage, fitZoom, setZoom,
   bbox, center, rotP, shiftObj, isLine, textLines, measure, baseOff, cssFont, rdims, baseName, parseRange, textObj, placeObj, insertImage, addAsset, readImage, imagePage,
   visible, getPdfPage, addSource, loadSource, openFiles, isPdf, isDocx, getText, getLines, getBlocks, toBlocks, getImages, scanPage, visibleText, covered, fontStyle, origFont, fontLabel, baseCanvas, baseSig, isBaseImg, aabb, hitsRect, hex, editOriginal, coverFor, convertRegion, renderPageImage, buildPdf, pageOp, movePage,
-  rotatePage, dupPage, deletePage, runFind, loadLib, isRedact, startEdit, r2, DB, convertTextItem, drawTI, showCtx, mi, pageSub, ensureFont, BUNDLED, FONTS, commitEdit, viewCenter, updateBell, flash };
+  rotatePage, dupPage, deletePage, movePageDlg, runFind, loadLib, isRedact, startEdit, r2, DB, convertTextItem, drawTI, showCtx, mi, pageSub, ensureFont, BUNDLED, FONTS, commitEdit, viewCenter, updateBell, flash };
 })();

@@ -30,6 +30,9 @@ xcopy /e /i /q /y "icons" "%STAGE%\icons" >nul
 copy /y "sw.js" "%STAGE%\" >nul
 copy /y "manifest.webmanifest" "%STAGE%\" >nul
 if not exist "%STAGE%\lib\pdf.min.js" goto :fail
+rem (the editor's own scripts are joined into one file, so the page needs one request instead of twelve)
+powershell -NoProfile -ExecutionPolicy Bypass -File "tools/bundle-js.ps1" "%STAGE%"
+if errorlevel 1 goto :fail
 
 echo  [2/2] Creating the ZIP...
 if not exist "%XD3_OUT%" mkdir "%XD3_OUT%"
