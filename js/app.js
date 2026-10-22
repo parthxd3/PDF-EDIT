@@ -97,7 +97,7 @@ const ICONS = {
   dist_h: 'M4 4v16M20 4v16M9 8h6v8H9z', dist_v: 'M4 4h16M4 20h16M8 9h8v6H8z', brush: 'M4 20c3 0 4-2 4-4l8-9 3 3-9 8c-2 0-3 1-6 2zM14 5l5 5',
   selall: 'M4 4h4M4 4v4M20 4h-4M20 4v4M4 20h4M4 20v-4M20 20h-4M20 20v-4M9 12l2 2 4-4', compress: 'M12 3v6M9 6l3 3 3-3M12 21v-6M9 18l3-3 3 3M4 12h16', minus: 'M5 12h14',
   bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0', bolt: 'M13 3L5 13h6l-1 8 8-10h-6z', sun: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5',
-  cut: 'M6 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM6 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM8 9l12 8M8 15L20 7', bookmark: 'M6 3h12v18l-6-4-6 4z',
+  cut: 'M6 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM6 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM8 9l12 8M8 15L20 7', bookmark: 'M6 3h12v18l-6-4-6 4z', link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1', crop: 'M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2',
   book: 'M4 5a2 2 0 0 1 2-2h6v18H6a2 2 0 0 0-2 2zM20 5a2 2 0 0 0-2-2h-6v18h6a2 2 0 0 1 2 2z', expand: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5M9 9l-5-5M15 9l5-5M9 15l-5 5M15 15l5 5', clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 3',
 };
 const HINTS = {
@@ -110,6 +110,8 @@ const HINTS = {
   pen: 'Draw freehand', marker: 'Drag over content to highlight freehand', hl: 'Drag a box to highlight an area',
   rect: 'Drag to draw a rectangle (Shift = square)', ellipse: 'Drag to draw an ellipse (Shift = circle)',
   line: 'Drag to draw a line (Shift = 45° steps)', arrow: 'Drag to draw an arrow (Shift = 45° steps)',
+  link: 'Drag a box over the words or picture that should become a link — to a website or to another page',
+  crop: 'Drag a box around the part of the page to keep — the rest is trimmed away when you save',
   whiteout: 'Drag a box to cover content with white', redact: 'Drag a box to black out content — when you save, pages with blackouts become pictures so the hidden text is really gone',
 };
 
@@ -237,7 +239,7 @@ function redo() { if (!S.redo.length) return; const s = snap(); const r = S.redo
 /* ───────── loading ───────── */
 function resetDoc() {
   commitEdit();
-  Object.assign(S, { sources: [], pages: [], assets: {}, assetVer: (S.assetVer || 0) + 1, xfonts: {}, outline: [], undo: [], redo: [], sel: null, cur: 0, meta: {}, dirty: false, find: { q: '', hits: [], cur: -1 } });
+  Object.assign(S, { sources: [], pages: [], assets: {}, assetVer: (S.assetVer || 0) + 1, xfonts: {}, outline: [], undo: [], redo: [], sel: null, cur: 0, meta: {}, metaOrig: null, dirty: false, find: { q: '', hits: [], cur: -1 } });
   S.srcVer++;
 }
 async function addSource(bytes) {
@@ -294,7 +296,8 @@ async function openFiles(files, append) {
     let first = !append;
     try {
       for (const f of files) {
-        if (isPdf(f)) { const pg = await loadSource(new Uint8Array(await f.arrayBuffer())); S.pages.push(...pg); if (first && pg.length && window.XD3.readOutline) S.outline = await window.XD3.readOutline(S.sources[pg[0].src].pdf, pg); }
+        if (isPdf(f)) { const pg = await loadSource(new Uint8Array(await f.arrayBuffer())); S.pages.push(...pg); if (first && pg.length && window.XD3.readOutline) S.outline = await window.XD3.readOutline(S.sources[pg[0].src].pdf, pg);
+          if (first && pg.length) try { const i = (await S.sources[pg[0].src].pdf.getMetadata()).info || {}; S.meta = { title: i.Title || '', author: i.Author || '', subject: i.Subject || '', keywords: i.Keywords || '' }; S.metaOrig = { ...S.meta }; } catch (e) { /* no document info */ } }
         else if (isDocx(f)) S.pages.push(...await window.XD3.docxToPages(f));
         else S.pages.push(imagePage(await readImage(f)));
         if (first) { S.fileName = f.name.replace(/\.\w+$/, '') + '.pdf'; first = false; }
@@ -341,6 +344,7 @@ function buildPages() {
       const pg = pageById(p.id), o = pg.objs.find(x => x.id === oe.dataset.id);
       if (o && o.type === 'text') startEdit(pg, o, snap());
       else if (o && o.type === 'image' && S.tool === 'select') { select(pg.id, o.id); ACT.imgedit(); }
+      else if (o && o.type === 'link') window.XD3.linkDlg(pg, o, false);
     });
     io.observe(wrap);
 
@@ -490,6 +494,7 @@ function objEl(o) {
       hit('line', { x1: o.x1, y1: o.y1, x2: o.x2, y2: o.y2 }); break;
     }
     case 'image': svg('image', { href: S.assets[o.asset] || '', x: o.x, y: o.y, width: o.w, height: o.h, preserveAspectRatio: 'none' }, g); break;
+    case 'link': { const r = svg('rect', { x: o.x, y: o.y, width: o.w, height: o.h, class: 'linkobj' }, g); svg('title', {}, r).textContent = o.url || (o.page ? 'Go to page ' + (S.pages.findIndex(q => q.id === o.page) + 1) : 'Link'); break; }
     case 'text': {
       ensureFont(o.font);
       const b = bbox(o), bg = o.bg && o.bg !== 'none';
@@ -508,6 +513,7 @@ function objEl(o) {
 function drawObjs(p) {
   const pe = PE.get(p.id); if (!pe) return; pe.gObjs.textContent = '';
   for (const o of p.objs) if (o.id !== S.editing) pe.gObjs.appendChild(objEl(o));
+  if (p.crop) { const c = p.crop; for (const [x, y, w, h] of [[0, 0, p.w, c.y], [0, c.y + c.h, p.w, p.h - c.y - c.h], [0, c.y, c.x, c.h], [c.x + c.w, c.y, p.w - c.x - c.w, c.h]]) if (w > 0 && h > 0) svg('rect', { x, y, width: w, height: h, class: 'cropmask' }, pe.gObjs); svg('rect', { x: c.x, y: c.y, width: c.w, height: c.h, class: 'cropline' }, pe.gObjs); } // (the trimmed-away part is shaded)
   if (S.sel && S.sel.pid === p.id) drawSel();
 }
 function drawSel() {
@@ -541,6 +547,8 @@ const NEW = {
   pen: (P, st) => ({ type: 'path', pts: [P], color: st.color, width: st.width, opacity: st.opacity }),
   marker: P => ({ type: 'path', pts: [P], color: '#facc15', width: 14, opacity: 0.4, blend: true }),
   hl: P => cover(P, '#facc15', { opacity: 0.4, blend: true }),
+  link: P => ({ type: 'link', x: P[0], y: P[1], w: 0, h: 0, url: '', opacity: 1 }),
+  crop: P => ({ type: 'rect', x: P[0], y: P[1], w: 0, h: 0, color: '#6d5efc', fill: 'none', width: 1, dash: 'dash', opacity: 1, crop: true }),
   whiteout: P => cover(P, '#ffffff', { cover: true }), redact: P => cover(P, '#000000', { cover: true, redact: true }),
   rect: (P, st) => shape('rect', P, st), ellipse: (P, st) => shape('ellipse', P, st),
   line: (P, st) => ({ type: 'line', x1: P[0], y1: P[1], x2: P[0], y2: P[1], color: st.color, width: st.width, dash: st.dash, opacity: st.opacity }),
@@ -652,6 +660,8 @@ function onUp() {
   } else if (d.kind === 'draw') {
     const b = bbox(d.o), tiny = d.o.type === 'path' ? false : Math.max(b.w, b.h) < 3;
     if (tiny) { d.p.objs.pop(); S.undo.pop(); drawObjs(d.p); updateUI(); return; }
+    if (d.o.crop) { d.p.objs.pop(); S.undo.pop(); drawObjs(d.p); return window.XD3.cropDlg(d.p, b); }
+    if (d.o.type === 'link') { setTool('select'); select(d.p.id, d.o.id); return window.XD3.linkDlg(d.p, d.o, true); }
     if (!STICKY.has(S.tool)) { setTool('select'); select(d.p.id, d.o.id); }
   } else if (d.moved) syncControls();
 }
@@ -915,9 +925,23 @@ async function editOriginal(p, it, str) { // cover an original line / paragraph 
       o.rot = it.rot; o.x = cx - b.w / 2; o.y = cy - b.h / 2;
     } else { o.x = it.align === 'center' ? it.x + (it.w - bbox(o).w) / 2 : it.x; o.y = it.base - baseOff(o); }
   }
-  for (const l of L) { const r = { x: l.x - 1.5, y: l.y - 0.5, w: l.w + 3, h: l.h + 1, rot: l.rot }; p.objs.push(coverFor(p, r, cv) || coverFor(p, r, hi || (hi = await baseCanvas(p, 2)))); }
+  const NT = X.native, regs = L.map(l => ({ x: l.x - 1.5, y: l.y - 0.5, w: l.w + 3, h: l.h + 1, rot: l.rot || 0 }));
+  const infos = NT && p.src >= 0 ? await Promise.all(regs.map((r, k) => NT.lineInfo(p, r, L[k].str).catch(() => null))) : [];
+  const i0 = infos.find(x => x && x.count && x.visible);
+  if (i0 && fx && !it.ocr && !it.hidden) { // the page's own instructions for this line: exact colour, size and font resource
+    if (i0.color) o.color = i0.color;
+    if (i0.canWrite) o.nat = { res: i0.res, Tfs: i0.Tfs, size: o.size, Tc: i0.Tc, Tw: i0.Tw, Tz: i0.Tz, color: o.color, fill: i0.fill, font: o.font, bold: !!o.bold, italic: !!o.italic, gaps: infos.map(x => x && x.gap), kern: Object.assign({}, ...infos.map(x => (x && x.kern) || {})) };
+  }
+  for (let k = 0; k < L.length; k++) {
+    const r = regs[k], c = coverFor(p, r, cv) || coverFor(p, r, hi || (hi = await baseCanvas(p, 2))), inf = infos[k];
+    if (inf && inf.count) Object.assign(c, { strip: inf.count, sr: r, sb: bbox(c), keep: !!(it.ocr || it.hidden || !inf.visible) }); // on save the glyphs are taken out of the page itself
+    c.link = o.id; p.objs.push(c);
+  }
+  if (str == null && !it.ocr && !it.hidden) o.orig = untouched(o); // while it stays like this, the page keeps its original line exactly
   p.objs.push(o); return o;
 }
+const UNTOUCHED = ['text', 'x', 'y', 'size', 'color', 'font', 'bold', 'italic', 'underline', 'strike', 'align', 'lh', 'rot', 'opacity', 'bg', 'ws'];
+const untouched = o => JSON.stringify(UNTOUCHED.map(k => o[k] ?? null));
 async function convertTextItem(p, i) {
   const pe = PE.get(p.id), it = (pe && pe.items ? pe.items : S.para ? await getBlocks(p) : await getText(p))[i]; if (!it) return;
   if (it.field) return window.XD3.fillField(p, it);
@@ -1233,7 +1257,7 @@ window.addEventListener('keydown', e => { // arrow keys / Enter / Esc inside an 
 const STAMPS = [['APPROVED', '#16a34a'], ['REJECTED', '#dc2626'], ['CONFIDENTIAL', '#dc2626'], ['DRAFT', '#64748b'], ['PAID', '#2563eb'], ['COPY', '#64748b'], ['SIGN HERE', '#d97706']];
 const TOOL_LIST = [['select', 'Select / move', 'cursor', 'V'], ['hand', 'Pan', 'hand'], ['edittext', 'Edit text', 'edittext', 'E'], ['editobj', 'Edit object', 'editobj', 'B'], ['text', 'Add text', 'text', 'T'], ['note', 'Sticky note', 'note', 'N'],
   ['pen', 'Pen', 'pen', 'P'], ['marker', 'Highlighter', 'marker', 'M'], ['hl', 'Highlight area', 'hl', 'H'], ['rect', 'Rectangle', 'rect', 'R'], ['ellipse', 'Ellipse', 'ellipse', 'O'], ['line', 'Line', 'line', 'L'], ['arrow', 'Arrow', 'arrow', 'A'],
-  ['whiteout', 'Whiteout', 'eraser', 'W'], ['redact', 'Blackout', 'redact']];
+  ['whiteout', 'Whiteout', 'eraser', 'W'], ['redact', 'Blackout', 'redact'], ['link', 'Link', 'link'], ['crop', 'Crop pages', 'crop']];
 const toolsSub = () => TOOL_LIST.map(([t, l, ic, key]) => mi(l, ic, 'tool', { d: { t }, key, checked: S.tool === t }));
 const insertSub = () => [mi('Image…', 'image', 'image'), mi('Signature…', 'sign', 'sign'), mi('Today’s date', 'cal', 'datestamp'),
   { label: 'Stamp', icon: 'stamp', sub: [...STAMPS.map(([t, c]) => mi(t[0] + t.slice(1).toLowerCase(), 'stamp', 'stamp', { d: { t, c } })), mi('Check mark', 'check', 'stamp', { d: { t: '✓', c: '#16a34a', plain: 1 } }), mi('Cross mark', 'x', 'stamp', { d: { t: '✗', c: '#dc2626', plain: 1 } })] },
@@ -1243,7 +1267,7 @@ const pageSub = () => { const n = S.pages.length, p = S.pages[S.cur]; return [
   mi('Rotate right', 'rotate', 'rotr'), mi('Rotate left', 'rotatel', 'rotl'), mi('Duplicate', 'copy', 'dup'), mi('Insert blank page after', 'plus', 'blank'), mi('Replace with another file…', 'swap', 'replacepage'), '-',
   mi('Move up', 'up', 'pgup', { disabled: S.cur === 0, key: 'Ctrl+Shift+↑' }), mi('Move down', 'down', 'pgdown', { disabled: S.cur >= n - 1, key: 'Ctrl+Shift+↓' }), mi('Move to position…', 'swap', 'moveto', { disabled: n < 2 }), mi('Move to start', 'front', 'pgtop', { disabled: S.cur === 0 }), mi('Move to end', 'back', 'pgend', { disabled: S.cur >= n - 1 }), '-',
   mi('Extract…', 'split', 'extract'), mi('Change size…', 'fit', 'resize'), mi('Add page numbers…', 'hash', 'pagenum'), mi('Bookmarks…', 'bookmark', 'bookmarks'), mi('Export as PNG', 'image', 'png'), '-',
-  mi('Remove all edits on page', 'eraser', 'clearpage', { disabled: !p || !p.objs.length }), mi('Delete page', 'trash', 'delpage', { danger: 1, disabled: n < 2 })]; };
+  p && p.crop && mi('Remove crop', 'crop', 'uncrop'), mi('Remove all edits on page', 'eraser', 'clearpage', { disabled: !p || !p.objs.length }), mi('Delete page', 'trash', 'delpage', { danger: 1, disabled: n < 2 })]; };
 const zoomSub = () => [mi('Zoom in', 'zoomin', 'zoomin', { key: 'Ctrl +' }), mi('Zoom out', 'zoomout', 'zoomout', { key: 'Ctrl −' }), mi('Actual size (100%)', '', 'zoomreset', { key: 'Ctrl+0' }), mi('Fit width', 'fit', 'fit'), mi('Fit whole page', 'pages', 'fitpage'), '-',
   mi('Show / hide page panel', 'panel', 'sidebar'), mi('Light / dark theme', 'moon', 'theme')];
 const convertSub = () => [mi('PDF → Word (.docx)…', 'word', 'pdf2docx'), mi('PDF → Images…', 'image', 'pdf2img'), mi('Export text (.txt)', 'text', 'exporttxt'), '-',
@@ -1296,6 +1320,8 @@ const appMenu = () => S.pages.length ? [
 ];
 function onContext(e, pid) { // right-click on a page: the object under the pointer, or the page itself
   commitEdit();
+  const ti = S.tool === 'edittext' && e.target.closest('[data-ti]');
+  if (ti) { S.ctxTI = { pid, i: +ti.dataset.ti }; return showCtx(e, [mi('Edit this text', 'edittext', 'ti_edit'), mi('Copy this text', 'copy', 'ti_copy'), '-', mi('Delete this text', 'trash', 'ti_del', { danger: 1 })]); }
   const p = pageById(pid), oe = e.target.closest('[data-id]'), hit = oe && p.objs.find(x => x.id === oe.dataset.id);
   if (hit) { if (S.tool !== 'select') setTool('select'); if (!(S.sel && S.sel.pid === pid && S.sel.ids.includes(hit.id))) select(pid, hit.id); }
   else select(null);
@@ -1459,28 +1485,59 @@ function rasterText(o) {
   for (const l of textLines(o)) { x.font = cssFont(o); x.fillText(l.ln, l.x, l.y); if (l.ln) for (const dy of decoY(o)) x.fillRect(l.x, l.y + o.size * dy - o.size / 32, l.w, Math.max(0.5, o.size / 16)); }
   return { url: c.toDataURL('image/png'), w: c.width / k, h: c.height / k };
 }
+const traceOn = () => { try { return localStorage.getItem('xd3.trace') === 'on'; } catch (e) { return false; } }; // off (default): the saved file keeps its own name, producer and dates
+async function redactable(p, R) { // can every blacked-out area be cleared by removing text alone? (no pictures and no edits of ours underneath, all text reachable)
+  const X = window.XD3; if (p.src < 0 || !X.native) return false;
+  const touch = (a, b) => hitsRect(a, b);
+  if (p.objs.some(o => !o.cover && R.some(r => touch(bbox(o), bbox(r))))) return false;
+  if ((await scanPage(p)).all.some(b => R.some(r => touch(b, bbox(r))))) return false;
+  const A = await X.native.analyze(p); if (!A) return false;
+  for (const r of R) {
+    const b = bbox(r), mine = A.glyphs.filter(g => g.bx.x < b.x + b.w && g.bx.x + g.bx.w > b.x && g.bx.y < b.y + b.h && g.bx.y + g.bx.h > b.y && g.uni !== ' ').length;
+    let seen = 0; for (const l of await getLines(p)) { const a = aabb(l); if (!touch(a, b)) continue; const ov = (Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) / (a.w || 1); seen += l.str.replace(/\s/g, '').length * Math.max(0, Math.min(1, ov)); }
+    if (mine < seen * 0.8 - 1) return false; // some of that text lives where we cannot remove it (e.g. inside a form XObject)
+  }
+  return true;
+}
 const isRedact = o => !!o.cover && (o.redact || o.fill === '#000000');
 const annotMode = () => { try { return localStorage.getItem('xd3.annots') !== 'off'; } catch (e) { return true; } };
 const isAnnot = o => !o.cover && (['ellipse', 'line', 'arrow', 'path'].includes(o.type) || (o.type === 'rect' && (o.blend || (o.color && o.color !== 'none'))) || (o.type === 'text' && o.note && o.text.trim()));
 async function buildPdf(pages, opt = {}) { // opt.redact: 'flatten' (default — pages with blackout boxes become pictures, nothing hidden is left) | 'cover'
   commitEdit();
-  const L = PDFLib, out = await L.PDFDocument.create(), docs = {}, copies = new Map(), occ = {}, batches = {};
-  for (const p of pages) { if (p.src < 0) continue; const kk = p.src + '|' + p.idx, k = occ[kk] = (occ[kk] || 0) + 1; (batches[p.src + '|' + k] = batches[p.src + '|' + k] || []).push(p); }
-  for (const key in batches) {
-    const src = +key.split('|')[0];
-    if (!docs[src]) {
-      try { docs[src] = await L.PDFDocument.load(S.sources[src].bytes); }
-      catch (e) { throw new Error(/encrypt/i.test(e.message) ? 'This PDF is encrypted / password-protected and cannot be re-saved. Remove the password first.' : 'Could not process this PDF: ' + e.message); }
+  const L = PDFLib, docs = {}, copies = new Map(), occ = {}, batches = {}, load = async src => {
+    try { return await L.PDFDocument.load(S.sources[src].bytes, { updateMetadata: false }); }
+    catch (e) { throw new Error(/encrypt/i.test(e.message) ? 'This PDF is encrypted / password-protected and cannot be re-saved. Remove the password first.' : 'Could not process this PDF: ' + e.message); }
+  };
+  // One source, every page at most once, nothing blacked out → the original file is edited in place: its forms, bookmarks, links,
+  // tags, attachments, metadata and fonts all stay exactly as they were. Otherwise the pages are copied into a new file.
+  const used = pages.filter(p => p.src >= 0), firstSrc = used.length ? used[0].src : -1, flat = new Set();
+  if (opt.redact !== 'cover') for (const p of pages) { const R = p.objs.filter(isRedact); if (R.length && !(await redactable(p, R))) flat.add(p); } // pictures (or text we cannot reach) under a blackout → that page becomes a picture
+  const inplace = !opt.copy && used.length && used.every(p => p.src === firstSrc) && new Set(used.map(p => p.idx)).size === used.length && !flat.size;
+  let out, dropped = [];
+  if (inplace) {
+    out = docs[firstSrc] = await load(firstSrc); const all = out.getPages();
+    for (let i = all.length - 1; i >= 0; i--) out.removePage(i);
+    used.forEach(p => copies.set(p, all[p.idx])); dropped = all.filter((pg, i) => !used.some(p => p.idx === i)).map(pg => pg.ref);
+    if (dropped.length) out.catalog.delete(L.PDFName.of('Outlines')); // (rebuilt below from the bookmarks that are left)
+  } else {
+    out = await L.PDFDocument.create({ updateMetadata: false });
+    for (const p of pages) { if (p.src < 0) continue; const kk = p.src + '|' + p.idx, k = occ[kk] = (occ[kk] || 0) + 1; (batches[p.src + '|' + k] = batches[p.src + '|' + k] || []).push(p); }
+    for (const key in batches) {
+      const src = +key.split('|')[0]; if (!docs[src]) docs[src] = await load(src);
+      const list = batches[key], cp = await out.copyPages(docs[src], list.map(p => p.idx));
+      list.forEach((p, i) => copies.set(p, cp[i]));
     }
-    const list = batches[key], cp = await out.copyPages(docs[src], list.map(p => p.idx));
-    list.forEach((p, i) => copies.set(p, cp[i]));
   }
   const fonts = {}, imgs = {};
   let kitReady = false;
   const simple = cp => cp < 0x0530 || (cp >= 0x1e00 && cp <= 0x22ff); // scripts that need no shaping: Latin, Greek, Cyrillic, punctuation, symbols
   const kitFont = async (key, bytes) => { // an embedded font file → { f, set }, or null when it cannot be embedded (whole file: pdf-lib's subsetter corrupts several faces)
     if (!(key in fonts)) {
-      try { if (!kitReady) { out.registerFontkit(await loadLib('fontkit')); kitReady = true; } const f = await out.embedFont(await bytes(), { subset: false, features: FEAT_OFF }); fonts[key] = { f, set: new Set(f.getCharacterSet()) }; }
+      try {
+        const kit = await loadLib('fontkit'), data = await bytes(), probe = kit.create(data instanceof Uint8Array ? data : new Uint8Array(data));
+        for (const cp of probe.characterSet) { const g = probe.glyphForCodePoint(cp); void g.advanceWidth; void g.cbox; } // a damaged font is found here, before it can break the saved file
+        if (!kitReady) { out.registerFontkit(kit); kitReady = true; } const f = await out.embedFont(data, { subset: false, features: FEAT_OFF }); fonts[key] = { f, set: new Set(f.getCharacterSet()) };
+      }
       catch (e) { console.warn('font embed failed', key, e); fonts[key] = null; }
     }
     return fonts[key];
@@ -1495,7 +1552,9 @@ async function buildPdf(pages, opt = {}) { // opt.redact: 'flatten' (default —
     return F && { font: F.f, has: cp => simple(cp) && F.set.has(cp), slant: !!o.italic, heavy: !!o.bold && !B[1] }; // no italic / bold file → slant or thicken the regular face, as the browser does on screen
   };
   const getRuns = async o => { // → text → [{ text, font, slant, heavy }] for one line, or null when this object has to be drawn as an image instead
-    const X = S.xfonts[o.font], D = X && await kitFont(o.font, () => X.bytes); if (X && !D) return null;
+    const X = S.xfonts[o.font]; let D = X && await kitFont(o.font, () => X.bytes);
+    if (D && D.good == null) { try { D.f.widthOfTextAtSize(o.text.replace(/\n/g, ''), 10); D.good = true; } catch (e) { D.good = false; } } // some extracted fonts embed but cannot be measured
+    if (D && !D.good) D = null;
     const P = D && { font: D.f, has: cp => simple(cp) && D.set.has(cp), slant: !!o.italic && !X.italic, heavy: !!o.bold && !X.bold }; // the document's own font …
     const fb = await famFont(X ? X.fb : o.font, o), pick = cp => P && P.has(cp) ? P : fb && fb.has(cp) ? fb : null; // … and the nearest family for characters it lacks
     for (const ch of o.text) if (ch !== '\n' && !pick(ch.codePointAt(0))) return null;
@@ -1513,16 +1572,75 @@ async function buildPdf(pages, opt = {}) { // opt.redact: 'flatten' (default —
     L.lineTo(x + w, y + h - r), L.appendBezierCurve(x + w, y + h - k, x + w - k, y + h, x + w - r, y + h), L.lineTo(x + r, y + h), L.appendBezierCurve(x + k, y + h, x, y + h - k, x, y + h - r),
     L.lineTo(x, y + r), L.appendBezierCurve(x, y + k, x + k, y, x + r, y), L.closePath()]; };
 
+  async function drawNative(page, o, sink) { // the edited text, written with the very font resource the original line used (no new font, exact glyphs); sink: collect the operators instead
+    const put = sink ? (...ops) => { sink.push(...ops); } : (...ops) => page.pushOperators(...ops);
+    const n = o.nat, NT = window.XD3.native; if (!n || !NT || n.font !== o.font || !!n.bold !== !!o.bold || !!n.italic !== !!o.italic) return false;
+    const F = NT.fontFor(out, page, n.res); if (!F || !F.ok) return false;
+    const xf = S.xfonts[o.font], lines = textLines(o); let fb = null; // (the look-alike face is only loaded when a letter needs it)
+    const tokens = ln => { // letters → the document font's glyphs (its ligatures first, as the original typesetting did), a look-alike face for letters it lacks
+      const ch = [...ln], out = [];
+      for (let j = 0; j < ch.length;) {
+        if (ch[j] === ' ') { out.push({ sp: 1, c: F.encode(' '), s: ' ' }); j++; continue; }
+        const l3 = ch.slice(j, j + 3).join(''), l2 = ch.slice(j, j + 2).join('');
+        if (ch.length - j >= 3 && F.lig.has(l3)) { out.push({ c: F.lig.get(l3), s: l3 }); j += 3; continue; }
+        if (ch.length - j >= 2 && F.lig.has(l2)) { out.push({ c: F.lig.get(l2), s: l2 }); j += 2; continue; }
+        const c = F.encode(ch[j]);
+        if (c != null) out.push({ c, s: ch[j] }); else if (fb && fb.has(ch[j].codePointAt(0))) out.push({ fb: 1, s: ch[j] }); else return null;
+        j++;
+      }
+      return out;
+    };
+    let enc = lines.map(l => tokens(l.ln));
+    if (enc.includes(null) && xf) { fb = await famFont(xf.fb, o); if (fb) enc = lines.map(l => tokens(l.ln)); }
+    if (enc.includes(null)) return false; // a character neither font has → the general path decides
+    const size = o.size, sc = size / (n.size || size), Th = (n.Tz || 100) / 100, Tc = (n.Tc || 0) * sc, Tw = (n.Tw || 0) * sc, sp = measure(' ', o), b = bbox(o), k = AL[o.align] || 0, op = o.opacity ?? 1, P = L.PDFOperator.of, num = v => L.PDFNumber.of(+v.toFixed(4)), kern = n.kern || {};
+    const colour = o.color === n.color && n.fill ? NT.fillOps(n.fill) : [L.setFillingRgbColor(...rgb01(o.color))], col = rgb01(o.color), tfs = n.Tfs > 0 ? size * n.Tfs / (n.size || size) : size, fk = size / tfs; // (same scale as the original: font size operand × fk = size on the page)
+    lines.forEach((l, i) => {
+      if (!l.ln) return; const e = enc[i], gap = n.gaps && n.gaps.length === lines.length && n.gaps[i] != null ? n.gaps[i] * sc : null, segs = [];
+      let seg = null, lw = 0;
+      const open = kind => { if (!seg || seg.kind !== kind) { seg = { kind, x: lw, items: [], codes: [], text: '' }; segs.push(seg); } return seg; };
+      const flush = s => { if (s && s.codes.length) { s.items.push(F.hex(s.codes)); s.codes = []; } };
+      e.forEach((t, j) => {
+        if (t.sp) { // a space keeps the original line's measured gap (or its word spacing)
+          const nat = t.c != null ? (F.w0(t.c) * size + Tc) * Th : 0, want = gap != null && gap > 0 ? gap : t.c != null ? nat + Tw * Th : sp;
+          if (t.c != null && seg && seg.kind === 'n') { seg.codes.push(t.c); flush(seg); const adj = want - nat; if (Math.abs(adj) > 1e-3) seg.items.push(num(-adj * 1000 / (size * Th))); }
+          else seg = null; // between other runs a space is just distance
+          lw += want; return;
+        }
+        if (t.fb) { const s = open('f'); s.text += t.s; lw += fb.font.widthOfTextAtSize(t.s, size); return; }
+        const s = open('n'), pv = e[j - 1], kd = pv && !pv.sp && !pv.fb ? kern[pv.s.slice(-1) + t.s[0]] : 0;
+        if (kd) { flush(s); s.items.push(num(-kd * 1000 / Th)); lw += kd * size; } // the original's kerning for this pair of letters
+        s.codes.push(t.c); lw += (F.w0(t.c) * size + Tc) * Th;
+      });
+      segs.forEach(flush); const x0 = o.x + (b.w - lw) * k;
+      for (const s of segs) {
+        if (s.kind === 'n') put(L.pushGraphicsState(), ...gs(page, op), L.concatTransformationMatrix(fk, 0, 0, -fk, x0 + s.x, l.y), L.beginText(), P('Tf', [L.PDFName.of(n.res), num(tfs)]), // (the original's own font size and scale, so every viewer renders it the same way)
+          P('Tc', [num(Tc / fk)]), P('Tw', [num(0)]), P('Tz', [num(Th * 100)]), P('Ts', [num(0)]), P('Tr', [num(0)]), ...colour, P('TJ', [out.context.obj(s.items)]), L.endText(), L.popGraphicsState());
+        else { // letters the document's font lacks: the look-alike face, slanted / thickened like the line around them
+          put(L.pushGraphicsState(), ...gs(page, op), L.concatTransformationMatrix(1, 0, 0, -1, x0 + s.x, l.y));
+          if (fb.heavy) put(L.setTextRenderingMode(L.TextRenderingMode.FillAndOutline), L.setStrokingRgbColor(...col), L.setLineWidth(size * 0.035));
+          put(...L.drawText(fb.font.encodeText(s.text), { color: L.rgb(...col), font: page.node.newFontDictionary(fb.font.name, fb.font.ref), size, rotate: L.degrees(0), xSkew: L.degrees(0), ySkew: L.degrees(fb.slant ? 12 : 0), x: 0, y: 0 })); put(L.popGraphicsState());
+        }
+      }
+      for (const dy of decoY(o)) put(L.pushGraphicsState(), ...gs(page, op), L.setStrokingRgbColor(...col), L.setLineWidth(Math.max(0.5, o.size / 16)),
+        L.moveTo(x0, l.y + o.size * dy), L.lineTo(x0 + lw, l.y + o.size * dy), L.stroke(), L.popGraphicsState());
+    });
+    return true;
+  }
   async function drawOne(page, o) { // coordinates here are page view space (y down)
     const op = o.opacity ?? 1;
     if (o.type === 'image') { const url = S.assets[o.asset]; if (!url) return; drawImg(page, imgs[o.asset] || (imgs[o.asset] = await embed(url)), o, o.x, o.y, o.w, o.h); return; }
     if (o.type === 'text') {
       await ensureFont(o.font);
-      const runsOf = await getRuns(o), b = bbox(o), k = AL[o.align] || 0, col = rgb01(o.color);
+      const b = bbox(o), k = AL[o.align] || 0, col = rgb01(o.color);
       if (o.bg && o.bg !== 'none') page.pushOperators(L.pushGraphicsState(), ...gs(page, op), L.setFillingRgbColor(...rgb01(o.bg)), ...rectOps(b.x - 3, b.y - 2, b.w + 6, b.h + 4), L.fill(), L.popGraphicsState());
-      if (!runsOf) { const r = rasterText(o); drawImg(page, await out.embedPng(r.url), o, o.x, o.y, r.w, r.h); return; } // text no font can encode (e.g. Hindi, Arabic, CJK) → crisp image
-      textLines(o).forEach(l => {
-        if (!l.ln) return; const runs = runsOf(l.ln); runs.forEach(r => r.w = r.F.font.widthOfTextAtSize(r.text, o.size) + (r.text.endsWith(' ') ? (o.ws || 0) * o.size : 0));
+      if (o.nat && await drawNative(page, o)) return;
+      let runsOf = null; try { runsOf = await getRuns(o); } catch (e) { console.warn('text font', e); }
+      let plan = null; // every run is measured before anything is drawn, so a font that fails half-way cannot leave a half-written line
+      if (runsOf) try { plan = textLines(o).map(l => { const runs = l.ln ? runsOf(l.ln) : []; runs.forEach(r => { r.F.font.encodeText(r.text); r.w = r.F.font.widthOfTextAtSize(r.text, o.size) + (r.text.endsWith(' ') ? (o.ws || 0) * o.size : 0); }); return { l, runs }; }); } catch (e) { console.warn('text font', e); plan = null; }
+      if (!plan) { const r = rasterText(o); drawImg(page, await out.embedPng(r.url), o, o.x, o.y, r.w, r.h); return; } // text no font can encode (e.g. Hindi, Arabic, CJK) → crisp image
+      plan.forEach(({ l, runs }) => {
+        if (!l.ln) return;
         const lw = runs.reduce((a, r) => a + r.w, 0), x = o.x + (b.w - lw) * k; let rx = x;
         for (const { F, text, w } of runs) {
           page.pushOperators(L.pushGraphicsState(), L.concatTransformationMatrix(1, 0, 0, -1, rx, l.y));
@@ -1590,21 +1708,48 @@ async function buildPdf(pages, opt = {}) { // opt.redact: 'flatten' (default —
     page.node.addAnnot(ctx.register(ctx.obj(d)));
   }
 
-  const annots = annotMode() && !opt.noAnnots, made = new Map(), X = window.XD3;
+  const annots = annotMode() && !opt.noAnnots, made = new Map(), X = window.XD3, filledIds = new Set();
+  if (inplace) { // filled-in form fields get their real value (they stay fillable), instead of text drawn over them
+    let form = null; try { form = out.getForm(); } catch (e) { /* no usable form */ }
+    if (form) for (const p of used) for (const o of p.objs) if (o.field) try {
+      const f = o.field;
+      if (f.kind === 'check') form.getCheckBox(f.name).check(); else if (f.kind === 'radio') form.getRadioGroup(f.name).select(f.on);
+      else if (f.kind === 'choice') { try { form.getDropdown(f.name).select(o.text); } catch (e) { form.getOptionList(f.name).select(o.text); } }
+      else form.getTextField(f.name).setText(o.text);
+      filledIds.add(o.id);
+    } catch (e) { /* drawn on the page instead */ }
+  }
+  const links = [];
+  const sameBox = (a, b) => b && Math.abs(a.x - b.x) < 0.01 && Math.abs(a.y - b.y) < 0.01 && Math.abs(a.w - b.w) < 0.01 && Math.abs(a.h - b.h) < 0.01;
   for (const p of pages) {
-    let page, inv, total = p.rot;
-    if (opt.redact !== 'cover' && p.objs.some(isRedact)) { // blacked-out page → saved as a picture, so the hidden text really is gone
+    let page, inv, total = p.rot, vt = null, gone = null, placed = null;
+    if (flat.has(p)) { // blacked-out page that cannot be cleaned otherwise → saved as a picture, so the hidden content really is gone
       const [rw, rh] = rdims(p), c = await renderPageImage(p, 200 / 72); page = out.addPage([rw, rh]); made.set(p, page);
       page.drawImage(await out.embedJpg(c.toDataURL('image/jpeg', 0.85)), { x: 0, y: 0, width: rw, height: rh }); continue;
     }
     if (p.src < 0) { page = out.addPage([p.w, p.h]); inv = [1, 0, 0, -1, 0, p.h]; }
     else {
       page = out.addPage(copies.get(p));
-      const pg = await getPdfPage(p), [a, b, c, d, e, f] = pg.getViewport({ scale: 1 }).transform, det = a * d - b * c;
+      const pg = await getPdfPage(p); vt = pg.getViewport({ scale: 1 }).transform; const [a, b, c, d, e, f] = vt, det = a * d - b * c;
       inv = [d / det, -b / det, -c / det, a / det, (c * f - d * e) / det, (b * e - a * f) / det]; total = (pg.rotate + p.rot) % 360;
     }
     page.setRotation(L.degrees(total)); made.set(p, page);
-    if (p.filled && p.filled.length && X.hideFields) X.hideFields(page, p); // filled-in form fields: the typed values are page content now
+    const pristine = new Set(p.objs.filter(o => o.type === 'text' && o.orig && o.orig === untouched(o)).map(o => o.id)); // edited, then left as it was
+    const strips = vt && X.native ? p.objs.filter(o => o.cover && o.strip && o.sr && sameBox(bbox(o), o.sb) && !pristine.has(o.link)) : [], reds = vt && X.native && opt.redact !== 'cover' ? p.objs.filter(isRedact) : [];
+    const inject = [];
+    for (const o of p.objs) { // edited text that can use the page's own font is written where the original line was (same clip, drawing order and tag)
+      if (o.type !== 'text' || !o.nat || pristine.has(o.id) || (o.bg && o.bg !== 'none')) continue;
+      const regs = strips.filter(c => c.link === o.id && !c.keep).map(c => c.id); if (!regs.length) continue;
+      const ops = []; if (o.rot) { const c = center(bbox(o)), a = o.rot * Math.PI / 180, cs = Math.cos(a), sn = Math.sin(a); ops.push(L.concatTransformationMatrix(cs, sn, -sn, cs, c[0] - c[0] * cs + c[1] * sn, c[1] - c[0] * sn - c[1] * cs)); }
+      try { if (await drawNative(page, o, ops)) inject.push({ id: o.id, regions: regs, ops: ops.map(String).join('\n') }); } catch (e) { console.warn('native text', e); }
+    }
+    if (strips.length || reds.length) try { // edited lines (and blacked-out text) are taken out of the page's own instructions — no cover box is needed for edits
+      const rm = X.native.strip(out, page, vt, [...strips.map(o => ({ id: o.id, r: o.sr })), ...reds.map(o => ({ id: o.id, r: bbox(o), touch: true }))], { inject, inv });
+      placed = rm.placed;
+      gone = new Set(strips.filter(o => !o.keep && rm.get(o.id) >= o.strip).map(o => o.id));
+    } catch (e) { console.warn('strip', e); }
+    const filledHere = p.filled ? p.objs.filter(o => o.field && filledIds.has(o.id)).map(o => JSON.stringify(o.field.rect)) : [];
+    if (p.filled && p.filled.length && X.hideFields) { const rest = p.filled.filter(r => !filledHere.includes(JSON.stringify(r))); if (rest.length) X.hideFields(page, { ...p, filled: rest }); } // filled-in fields that are page content now
     if (p.ocr && p.ocr.length) { // recognised text goes in as an invisible layer, so the scan can be searched and copied in any reader
       const F = await famFont('Helvetica', { bold: false, italic: false });
       page.pushOperators(L.pushGraphicsState(), L.concatTransformationMatrix(...inv), L.setTextRenderingMode(L.TextRenderingMode.Invisible));
@@ -1618,7 +1763,11 @@ async function buildPdf(pages, opt = {}) { // opt.redact: 'flatten' (default —
     }
     if (!p.objs.length) continue;
     page.pushOperators(L.pushGraphicsState(), L.concatTransformationMatrix(...inv));
+    if (p.crop) { const c = p.crop, q = [[c.x, c.y], [c.x + c.w, c.y], [c.x, c.y + c.h], [c.x + c.w, c.y + c.h]].map(([x, y]) => [inv[0] * x + inv[2] * y + inv[4], inv[1] * x + inv[3] * y + inv[5]]), xs = q.map(v => v[0]), ys = q.map(v => v[1]);
+      page.setCropBox(Math.min(...xs), Math.min(...ys), Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)); }
+    for (const o of p.objs) if (o.type === 'link') links.push({ page, o, inv });
     for (const o of p.objs) {
+      if ((gone && gone.has(o.id)) || (placed && placed.has(o.id)) || filledIds.has(o.id) || o.type === 'link' || pristine.has(o.id) || (o.cover && o.link && pristine.has(o.link))) continue;
       if (annots && isAnnot(o)) { try { addAnnot(page, o, inv); continue; } catch (e) { console.warn('comment', e); } }
       const rot = !isLine(o) && o.rot;
       if (rot) { const c = center(bbox(o)), a = rot * Math.PI / 180, cs = Math.cos(a), sn = Math.sin(a); page.pushOperators(L.pushGraphicsState(), L.concatTransformationMatrix(cs, sn, -sn, cs, c[0] - c[0] * cs + c[1] * sn, c[1] - c[0] * sn - c[1] * cs)); }
@@ -1627,11 +1776,25 @@ async function buildPdf(pages, opt = {}) { // opt.redact: 'flatten' (default —
     }
     page.pushOperators(L.popGraphicsState());
   }
+  for (const { page, o, inv } of links) try { // links: real link annotations (invisible boxes that open a web address or jump to a page)
+    const q = [[o.x, o.y], [o.x + o.w, o.y + o.h]].map(([x, y]) => [inv[0] * x + inv[2] * y + inv[4], inv[1] * x + inv[3] * y + inv[5]]), rect = [Math.min(q[0][0], q[1][0]), Math.min(q[0][1], q[1][1]), Math.max(q[0][0], q[1][0]), Math.max(q[0][1], q[1][1])];
+    const target = o.page && made.get(pages.find(x => x.id === o.page)), d = { Type: 'Annot', Subtype: 'Link', Rect: rect, Border: [0, 0, 0], F: 4 };
+    if (o.url) d.A = { S: 'URI', URI: L.PDFString.of(o.url) }; else if (target) d.Dest = [target.ref, 'XYZ', null, null, null]; else continue;
+    page.node.addAnnot(out.context.register(out.context.obj(d)));
+  } catch (e) { console.warn('link', e); }
   if (X.writeOutline) try { X.writeOutline(out, pages, made); } catch (e) { console.warn('bookmarks', e); }
-  const m = S.meta;
-  if (m.title) out.setTitle(m.title); if (m.author) out.setAuthor(m.author); if (m.subject) out.setSubject(m.subject);
-  if (m.keywords) out.setKeywords(m.keywords.split(',').map(s => s.trim()).filter(Boolean));
-  out.setProducer('XD3 PDF Editor (XD3Labs / XDCybertech Pvt Ltd)'); out.setModificationDate(new Date());
+  const m = S.meta || {}, mo = S.metaOrig || {}, d0 = !inplace && docs[firstSrc];
+  if (d0) try { // a new file made from one document carries that document's info over
+    const t = d0.getTitle(), au = d0.getAuthor(), su = d0.getSubject(), kw = d0.getKeywords(), cr = d0.getCreator(), pr = d0.getProducer(), cd = d0.getCreationDate(), md = d0.getModificationDate();
+    if (t) out.setTitle(t); if (au) out.setAuthor(au); if (su) out.setSubject(su); if (kw) out.setKeywords([kw]); if (cr) out.setCreator(cr); if (pr) out.setProducer(pr); if (cd) out.setCreationDate(cd); if (md) out.setModificationDate(md);
+  } catch (e) { /* no document info */ }
+  if ((m.title || '') !== (mo.title || '')) out.setTitle(m.title || ''); if ((m.author || '') !== (mo.author || '')) out.setAuthor(m.author || ''); if ((m.subject || '') !== (mo.subject || '')) out.setSubject(m.subject || '');
+  if ((m.keywords || '') !== (mo.keywords || '')) out.setKeywords((m.keywords || '').split(',').map(s => s.trim()).filter(Boolean));
+  if (traceOn()) { out.setProducer('XD3 PDF Editor (XD3Labs / XDCybertech Pvt Ltd)'); out.setModificationDate(new Date()); }
+  if (X.native) { // nothing that was removed (deleted pages, their links and fields, replaced content) may stay inside the file
+    X.native.scrubDead(out); const live = X.native.collectGarbage(out);
+    if (inplace && dropped.some(r => live.has(r.tag))) return buildPdf(pages, { ...opt, copy: true }); // (still referenced somewhere unusual → a fresh copy instead)
+  }
   return out.save();
 }
 async function save() {
@@ -1644,7 +1807,7 @@ async function save() {
   }
   await busy(async () => {
     const bytes = await buildPdf(S.pages, { redact });
-    download(new Blob([bytes], { type: 'application/pdf' }), /-edited$/.test(baseName()) || S.sources.length === 0 ? S.fileName : baseName() + '-edited.pdf');
+    download(new Blob([bytes], { type: 'application/pdf' }), !traceOn() || /-edited$/.test(baseName()) || S.sources.length === 0 ? S.fileName : baseName() + '-edited.pdf');
     S.dirty = false; updateUI(); flash($('#topbar [data-act=save]'), 'flash'); toast('PDF saved to your downloads');
   }, 'Building PDF…');
 }
@@ -1665,8 +1828,9 @@ async function propsDlg() {
     <label>Author<input type="text" name="author" value="${esc(m.author || '')}"></label>
     <label>Subject<input type="text" name="subject" value="${esc(m.subject || '')}"></label>
     <label>Keywords (comma separated)<input type="text" name="keywords" value="${esc(m.keywords || '')}"></label>
-    <p style="color:var(--mut)">${S.pages.length} page(s) · applied when you save.</p>`, { ok: 'Apply' });
-  if (!r) return;
+    <label class="inl"><input type="checkbox" name="trace"${traceOn() ? ' checked' : ''}>Mark saved files as edited (XD3 as producer, today's modification date, “-edited” in the file name)</label>
+    <p style="color:var(--mut)">${S.pages.length} page(s) · applied when you save. Left unticked, a saved file keeps the original's name, producer and dates, so nothing shows it was edited.</p>`, { ok: 'Apply' });
+  if (!r) return; try { localStorage.setItem('xd3.trace', r.trace ? 'on' : 'off'); } catch (e) { /* not remembered */ }
   S.meta = { title: r.title, author: r.author, subject: r.subject, keywords: r.keywords };
   if (r.file.trim()) S.fileName = r.file.trim().replace(/\.pdf$/i, '') + '.pdf';
   S.dirty = true; updateUI(); scheduleSave();
@@ -1699,6 +1863,18 @@ const ACT = {
   tsize: b => { const o = textTarget(); if (o) quickProp('size', clamp(Math.round(o.size) + +b.dataset.v, 4, 300)); }, setfont: b => { ensureFont(b.dataset.f); quickProp('font', b.dataset.f); },
   toallpages: toAllPages, imgreplace: imgReplace, imgsave: imgSave,
   ed_cut: () => document.execCommand('cut'), ed_copy: () => document.execCommand('copy'), ed_paste: edPaste, ed_selall: () => document.execCommand('selectAll'), ed_done: () => commitEdit(),
+  ti_edit: () => { const c = S.ctxTI, p = c && pageById(c.pid); if (p) convertTextItem(p, c.i); },
+  ti_copy: () => { const c = S.ctxTI, pe = c && PE.get(c.pid), it = pe && pe.items && pe.items[c.i]; if (it) (navigator.clipboard ? navigator.clipboard.writeText(it.str) : Promise.reject()).then(() => toast('Copied'), () => toast('Copy is not available here')); },
+  ti_del: async () => { // the line is taken out of the page (on save, out of the file itself)
+    const c = S.ctxTI, p = c && pageById(c.pid), pe = c && PE.get(c.pid), it = pe && pe.items && pe.items[c.i]; if (!it) return;
+    const before = snap(), o = await editOriginal(p, it); p.objs = p.objs.filter(x => x !== o); pushUndo(before); drawObjs(p); drawTI(p); toast('Text deleted (Ctrl+Z to undo)');
+  },
+  redactall: () => { // black out every match of the search
+    if (!S.find.hits.length) return toast('Search for the words to black out first'); pushUndo();
+    for (const h of S.find.hits) { const p = pageById(h.pid); if (p) p.objs.push({ id: uid(), type: 'rect', cover: true, redact: true, x: h.x - 1, y: h.y - 0.5, w: h.w + 2, h: h.h + 1, color: 'none', fill: '#000000', width: 0, opacity: 1 }); }
+    const n = S.find.hits.length; S.pages.forEach(drawObjs); runFind(S.find.q); toast(`${n} match(es) blacked out — they are removed from the file when you save`);
+  },
+  uncrop: () => { const p = S.pages[S.cur]; if (!p || !p.crop) return; pushUndo(); delete p.crop; drawObjs(p); },
   pgtop: () => { if (S.cur > 0) { movePage(S.cur, 0); goToPage(0); } }, pgend: () => { const n = S.pages.length - 1; if (S.cur < n) { movePage(S.cur, n); goToPage(n); } },
   merge: () => $('#fMerge').click(), imgpages: () => $('#fImgPages').click(), extract: extractDlg, png: exportPng,
   image: () => $('#fImg').click(),
@@ -1724,7 +1900,7 @@ const ACT = {
     <p style="color:var(--mut)">Everything runs on your device — no internet connection is needed and your documents are never uploaded. The app is locked down so it can only load its own bundled files.</p>
     <p style="color:var(--mut)">Text in scans and pictures is read on your device by the bundled Tesseract OCR engine (Apache 2.0 licence).</p>
     <p style="color:var(--mut)">Bundled fonts come from Google Fonts under the SIL Open Font, Apache 2.0 and Ubuntu Font licences (see lib/fonts/README.txt).</p>
-    <p style="color:var(--mut)">Note: edited text, picked-up objects and whiteout cover the original content visually; the original data underneath remains in the file. Pages with blackout boxes are saved as pictures, which removes it for good.</p>`),
+    <p style="color:var(--mut)">Edited and deleted text is removed from the file itself and rewritten with the document's own fonts; blacked-out text is removed too (a page is turned into a picture only when a blackout covers a picture). Picked-up objects and whiteout still cover what is underneath.</p>`),
 };
 document.addEventListener('click', e => {
   const sb = e.target.closest('.hassub'); if (sb) { clearTimeout(subTimer); if (!sb.classList.contains('subopen')) openSub(sb); return; } // a submenu parent keeps the menu open
@@ -1834,5 +2010,5 @@ window.XD3 = { S, PE, ACT, NO_DOC, HINTS, A4, CSS_UNITS, LH, BASE, viewer, $, $$
   pushUndo, snap, resetDoc, scheduleSave, buildPages, layout, drawObjs, drawSel, select, selObjs, selOne, setTool, syncControls, updateUI, goToPage, fitZoom, setZoom,
   bbox, center, rotP, shiftObj, isLine, textLines, measure, baseOff, cssFont, rdims, baseName, parseRange, textObj, placeObj, insertImage, addAsset, readImage, imagePage,
   visible, getPdfPage, addSource, loadSource, openFiles, isPdf, isDocx, getText, getLines, getBlocks, toBlocks, getImages, scanPage, visibleText, covered, fontStyle, origFont, fontLabel, baseCanvas, baseSig, isBaseImg, aabb, hitsRect, hex, editOriginal, coverFor, convertRegion, renderPageImage, buildPdf, pageOp, movePage,
-  rotatePage, dupPage, deletePage, movePageDlg, runFind, loadLib, isRedact, startEdit, r2, DB, convertTextItem, drawTI, showCtx, mi, pageSub, ensureFont, BUNDLED, FONTS, commitEdit, viewCenter, updateBell, flash };
+  rotatePage, dupPage, deletePage, movePageDlg, traceOn, runFind, loadLib, isRedact, startEdit, r2, DB, convertTextItem, drawTI, showCtx, mi, pageSub, ensureFont, BUNDLED, FONTS, commitEdit, viewCenter, updateBell, flash };
 })();

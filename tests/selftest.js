@@ -8,6 +8,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const load = async (name, type = 'application/pdf') => { const res = await fetch('tests/samples/' + name); if (!res.ok) throw new Error('sample missing: ' + name); S.dirty = false; await X.openFiles([new File([await res.blob()], name, { type })], false); const p = S.pages[0]; X.visible.add(p.id); return p; };
 const items = async p => { X.setTool('edittext'); await X.ocrItems(p); await sleep(50); await X.drawTI(p); return X.PE.get(p.id).items || []; };
 const reopen = bytes => pdfjsLib.getDocument({ data: bytes.slice(), cMapUrl: 'lib/cmaps/', cMapPacked: true, standardFontDataUrl: 'lib/standard_fonts/', isEvalSupported: false, fontExtraProperties: true }).promise;
+const pixelDiff = async (a, b, n = 1) => { // pages rendered at 3× and compared: number of clearly different pixels
+  const draw = async bytes => { const pdf = await reopen(bytes), pg = await pdf.getPage(n), vp = pg.getViewport({ scale: 3 }), c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; const x = c.getContext('2d', { willReadFrequently: true }); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); await pg.render({ canvasContext: x, viewport: vp, intent: 'print' }).promise; return x.getImageData(0, 0, c.width, c.height).data; };
+  const A = await draw(a), B = await draw(b); if (A.length !== B.length) return -1; let d = 0; for (let i = 0; i < A.length; i += 4) if (Math.abs(A[i] - B[i]) + Math.abs(A[i + 1] - B[i + 1]) + Math.abs(A[i + 2] - B[i + 2]) > 60) d++; return d;
+};
+const fontNames = async pdf => { const pg = await pdf.getPage(1), tc = await pg.getTextContent(); await pg.getOperatorList(); const m = {}; for (const it of tc.items) if (it.str.trim()) { try { m[it.str] = pg.commonObjs.get(it.fontName).name; } catch (e) { /* */ } } return m; };
 const textOf = async (pdf, i = 1) => (await (await pdf.getPage(i)).getTextContent()).items.map(t => t.str).join(' ');
 
 async function run() {
@@ -33,9 +38,48 @@ async function run() {
   await pg.getOperatorList(); const names = new Set(); for (const it of (await pg.getTextContent()).items) { try { names.add(pg.commonObjs.get(it.fontName).name); } catch (e) { /* */ } }
   ok('save: document font embedded again', [...names].some(n => /Lato/.test(n)), [...names].join(','));
 
-  // ── blackout: page becomes a picture when saved ──
-  p = S.pages[0]; p.objs.push({ id: X.uid(), type: 'rect', cover: true, redact: true, x: 55, y: 55, w: 300, h: 30, color: 'none', fill: '#000000', width: 0, opacity: 1 });
-  pdf = await reopen(await X.buildPdf(S.pages)); ok('redaction: blacked-out page holds no text', (await textOf(pdf)).trim() === '', (await textOf(pdf)).slice(0, 40));
+  // ── no trace of editing: unchanged edits are invisible, changed text uses the original font, file info is kept ──
+  const origBytes = new Uint8Array(await (await fetch('tests/samples/native.pdf')).arrayBuffer());
+  p = await load('native.pdf'); its = await items(p);
+  for (const it of its.filter(i => !i.ocr)) await X.editOriginal(p, it);
+  bytes = await X.buildPdf(S.pages); ok('no trace: re-typed lines are pixel-identical to the original', await pixelDiff(origBytes, bytes) === 0);
+  const before = await fontNames(await reopen(origBytes));
+  p.objs.find(o => o.type === 'text' && o.text === 'Acme Trading').text = 'Acme Holdings';
+  p.objs.find(o => o.type === 'text' && o.text === 'Standard Times text that is not embedded').text = 'Standard Times text, edited';
+  bytes = await X.buildPdf(S.pages); pdf = await reopen(bytes); let tx = await textOf(pdf);
+  ok('no trace: old words removed from the file', !/Acme Trading|not embedded/.test(tx) && /Acme Holdings/.test(tx) && /text, edited/.test(tx), tx.slice(0, 80));
+  const after = await fontNames(pdf);
+  ok('no trace: new words use the original font resource', after['Acme Holdings'] === before['Acme Trading'] && after['Standard Times text, edited'] === 'Times-Roman', `${after['Acme Holdings']} / ${before['Acme Trading']}`);
+  ok('no trace: no extra fonts embedded', new Set(Object.values(after)).size <= new Set(Object.values(before)).size, [...new Set(Object.values(after))].join(','));
+  ok('no trace: producer and file name kept', (await pdf.getMetadata()).info.Producer === (await (await reopen(origBytes)).getMetadata()).info.Producer && S.fileName === 'native.pdf', (await pdf.getMetadata()).info.Producer);
+  ok('no trace: saved file is not bigger than needed', bytes.length < origBytes.length * 1.15, `${bytes.length} vs ${origBytes.length}`);
+  // a real-world file (Chrome / Edge print, two-byte CID fonts, kerning, ligatures): every line rewritten stays visually the same
+  if ((await fetch('tests/samples/edge.pdf', { method: 'HEAD' })).ok) {
+    const eb = new Uint8Array(await (await fetch('tests/samples/edge.pdf')).arrayBuffer()); p = await load('edge.pdf'); its = await items(p); const eo = [];
+    for (const it of its.filter(i => !i.ocr)) eo.push(await X.editOriginal(p, it)); eo.forEach(o => { o.orig = null; }); // (forces every line to be written anew)
+    bytes = await X.buildPdf(S.pages); const dpx = await pixelDiff(eb, bytes);
+    ok('CID fonts: rewritten page matches the original', dpx >= 0 && dpx < 612 * 792 * 9 * 0.001, dpx + ' px (anti-aliasing only)'); // (< 0.1 % of the page: one-pixel snapping, invisible)
+    eo.find(o => /^Quarterly/.test(o.text)).text = 'Quarterly Report 2027'; bytes = await X.buildPdf(S.pages); tx = (await textOf(await reopen(bytes))).replace(/\s+/g, '');
+    ok('CID fonts: changed heading saved, old one gone, no cover boxes', /Report2027/.test(tx) && !/2026/.test(tx), tx.slice(0, 40));
+  }
+  // delete a line through the right-click action, delete page 2 → neither survives in the file
+  p = await load('native.pdf'); its = await items(p); S.ctxTI = { pid: p.id, i: its.findIndex(i => i.str === 'dated today') }; await X.ACT.ti_del();
+  S.pages.splice(1, 1); X.buildPages(); bytes = await X.buildPdf(S.pages); pdf = await reopen(bytes);
+  ok('delete text: line removed from the file', !/dated today/.test(await textOf(pdf)));
+  let pageObjs = 0; for (const [, o] of (await PDFLib.PDFDocument.load(bytes, { updateMetadata: false })).context.enumerateIndirectObjects()) if (o instanceof PDFLib.PDFDict && String(o.get(PDFLib.PDFName.of('Type'))) === '/Page') pageObjs++;
+  ok('delete page: removed page is not left inside the file', pdf.numPages === 1 && pageObjs === 1, pageObjs);
+  // links and crop
+  p = S.pages[0]; p.objs.push({ id: X.uid(), type: 'link', x: 58, y: 530, w: 100, h: 14, url: 'https://xd3labs.example/', opacity: 1 }); p.crop = { x: 40, y: 40, w: 400, h: 500 };
+  pdf = await reopen(await X.buildPdf(S.pages)); pg = await pdf.getPage(1); ann = await pg.getAnnotations();
+  ok('link: saved as a link annotation', ann.some(a => a.subtype === 'Link' && a.url === 'https://xd3labs.example/'), ann.filter(a => a.subtype === 'Link').map(a => a.url).join(','));
+  const vw = pg.getViewport({ scale: 1 }); ok('crop: page trimmed to the box', Math.round(vw.width) === 400 && Math.round(vw.height) === 500, `${vw.width}×${vw.height}`);
+
+  // ── blackout: the words under the box are removed from the file; the rest stays real text ──
+  p = await load('native.pdf'); p.objs.push({ id: X.uid(), type: 'rect', cover: true, redact: true, x: 55, y: 50, w: 300, h: 18, color: 'none', fill: '#000000', width: 0, opacity: 1 });
+  pdf = await reopen(await X.buildPdf(S.pages)); tx = await textOf(pdf);
+  ok('redaction: blacked-out words removed, page stays text', !/Invoice|Acme/.test(tx) && /quick brown/.test(tx), tx.slice(0, 50));
+  p.objs.push({ id: X.uid(), type: 'rect', cover: true, redact: true, x: 70, y: 370, w: 120, h: 30, color: 'none', fill: '#000000', width: 0, opacity: 1 });
+  pdf = await reopen(await X.buildPdf(S.pages)); ok('redaction: blackout over a picture makes that page a picture', (await textOf(pdf)).trim() === '');
   pdf = await reopen(await X.buildPdf(S.pages, { redact: 'cover' })); ok('redaction: "keep editable" keeps text', /Invoice/.test(await textOf(pdf)));
 
   // ── scans: OCR, font fit, searchable layer ──
@@ -60,8 +104,8 @@ async function run() {
   ok('form: fields outlined', fields.length === 4, fields.map(f => f.ft + ':' + f.name).join(','));
   const city = fields.find(f => f.name === 'city'); if (city) { await X.fillField(p, city); X.commitEdit(); const t = p.objs.find(x => x.type === 'text'); ok('form: text field prefilled', t && t.text === 'Pune', t && t.text); }
   const agree = fields.find(f => f.name === 'agree'); if (agree) { await X.fillField(p, agree); ok('form: checkbox ticked', p.objs.some(x => x.text === '✓')); }
-  pdf = await reopen(await X.buildPdf(S.pages)); const left = (await (await pdf.getPage(1)).getAnnotations()).filter(a => a.subtype === 'Widget').length;
-  ok('form: filled widgets removed on save', left === 2, left);
+  pdf = await reopen(await X.buildPdf(S.pages)); const wid = (await (await pdf.getPage(1)).getAnnotations()).filter(a => a.subtype === 'Widget'), val = n => (wid.find(a => a.fieldName === n) || {}).fieldValue;
+  ok('form: values saved into the real fields', val('city') === 'Pune' && val('agree') && val('agree') !== 'Off' && wid.length === 4, `${val('city')} ${val('agree')} ${wid.length}`);
 
   // ── reading mode: selectable text, links, highlight from a selection; Add text: click, type, click again ──
   p = await load('native.pdf'); X.setZoom(1); if (!document.body.classList.contains('reader')) X.ACT.reader(); await sleep(1200);

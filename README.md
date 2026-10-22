@@ -5,19 +5,24 @@ web app, or as a Windows program — and nothing is ever uploaded.
 
 ## What it does
 
-- **Edit text in place** — click any line or paragraph and retype it. The document's own fonts are reused (embedded fonts are extracted and
-  re-embedded on save), word spacing and justified lines are kept, rotated text is editable, and a bold word inside a line keeps its weight.
+- **Edit text in place, invisibly** — click any line or paragraph and retype it. On save the old words are removed from the page's own
+  instructions and the new ones are written with the document's own font resource, in the same place in the drawing order (same clip, same
+  tag), keeping the original's word spacing, kerning and ligatures. A line you open but do not change is left byte-for-byte untouched. Only
+  letters the document's (subset) font lacks are borrowed from a metric-compatible look-alike (Carlito for Calibri, Gelasio for Georgia, …).
+  The saved file keeps its name, producer, dates, forms, bookmarks, links and tags — nothing marks it as edited (Properties ▸ untick to brand it).
 - **Edit scans and pictures** — text in scanned pages, flattened PDFs and images is recognised offline (Tesseract OCR, 14 languages) and
   becomes editable; crooked scans are straightened first; the closest typeface, size and colour are matched automatically.
 - **Edit objects** — pick up pictures (at full resolution, with transparency) or any region, then move, resize, rotate or delete it.
-- **Forms** — fill in text fields, checkboxes, radio buttons and dropdowns.
+- **Forms** — fill in text fields, checkboxes, radio buttons and dropdowns; values go into the real fields, which stay fillable.
 - **Annotate** — pen, highlighter, shapes, arrows, sticky notes; saved as real PDF comments other readers can edit (or flattened, your choice).
-- **Blackout** — pages with blackout boxes are saved as pictures, so the hidden text really is gone.
+- **Blackout / redaction** — the text under a blackout box is removed from the file (the page stays real text); a page is turned into a
+  picture only when a blackout covers a picture. *Find ▸ Black out all* redacts every match. Deleted pages leave nothing behind in the file.
 - **Make searchable** — OCR a scanned document and keep the words as an invisible layer that any reader can search and copy.
 - **Pages** — merge PDF / Word / images, reorder, rotate, replace, extract, resize, page numbers, headers and footers, bookmarks.
 - **Convert** — PDF ⇄ Word, PDF → images, images → PDF, text export; compress; split; compare two versions; batch processing.
 - **Protect** — AES password protection, permanent redaction (flatten).
 - **Insert** — images, signatures (drawn or typed), stamps, dates, watermarks; scan with the camera.
+- **Links and crop** — add links to web pages or other pages; crop pages (one, all, or all of the same size).
 - **Read** — a reading mode with selectable text, clickable links, bookmarks in the side panel, night colours and full screen; select text to highlight, comment or copy it. Recently opened files are one click away on the start screen.
 
 ## Running it
@@ -40,6 +45,7 @@ same suite when started with `XD3_SELFTEST=1`.
 index.html            the app shell (strict Content-Security-Policy: only its own files)
 css/style.css
 js/app.js             viewer, tools, text editing, export (pdf-lib)
+js/native.js          content-stream engine: finds, removes and rewrites the page's own text (invisible edits, true redaction)
 js/ocr.js             offline OCR, deskew, typeface matching
 js/forms.js           form filling          js/extras.js   searchable PDF, bookmarks, compare, batch
 js/insert.js          stamps, watermark, page numbers, signature

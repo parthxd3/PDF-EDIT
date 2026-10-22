@@ -242,6 +242,10 @@ body[data-mode="edittext"] .overlay { cursor: default; touch-action: auto !impor
 .ti.img { stroke: rgba(var(--acc2-rgb), .8); cursor: pointer; }
 .ti.ocr { stroke: rgba(var(--acc2-rgb), .85); }
 .ti.form { stroke: rgba(16, 185, 129, .9); stroke-dasharray: 2 2; }
+.linkobj { fill: rgba(59, 130, 246, .1); stroke: #3b82f6; stroke-dasharray: 4 2; vector-effect: non-scaling-stroke; }
+body.reader .linkobj { fill: transparent; stroke: transparent; }
+.cropmask { fill: rgba(8, 10, 18, .55); pointer-events: none; }
+.cropline { fill: none; stroke: #fff; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; pointer-events: none; }
 .ti.form:hover { fill: rgba(16, 185, 129, .18); stroke: #10b981; }
 .bmlist { max-height: 46vh; overflow: auto; margin: 6px 0 10px; border: 1px solid var(--line); border-radius: 8px; padding: 4px; }
 .bm { display: flex; gap: 4px; align-items: center; padding: 2px 4px; }

@@ -88,6 +88,7 @@
       <button class="tool wide" data-act="watermark" title="Watermark"><i data-icon="drop"></i><span>Watermark</span></button>
       <button class="tool wide" data-act="pagenum" title="Page numbers"><i data-icon="hash"></i><span>Page numbers</span></button>
       <button class="tool wide" data-act="headfoot" title="Header / footer"><i data-icon="stroke"></i><span>Header / footer</span></button>
+      <button class="tool wide" data-tool="link" title="Add a link to a website or another page"><i data-icon="link"></i><span>Link</span></button>
       <span class="sep"></span>
       <button class="tool wide" data-act="scan" title="Scan with the camera or from photos"><i data-icon="scan"></i><span>Scan</span></button>
     </div>
@@ -108,6 +109,7 @@
       <button class="tool wide" data-act="replacepage" title="Replace this page with pages from another file"><i data-icon="swap"></i><span>Replace</span></button>
       <button class="tool wide" data-act="extract" title="Save chosen pages as a new PDF"><i data-icon="split"></i><span>Extract</span></button>
       <button class="tool wide" data-act="resize" title="Change page size (A4, Letter…)"><i data-icon="fit"></i><span>Page size</span></button>
+      <button class="tool wide" data-tool="crop" title="Crop — keep only part of the page"><i data-icon="crop"></i><span>Crop</span></button>
       <button class="tool wide" data-act="pagenum" title="Add page numbers"><i data-icon="hash"></i><span>Numbers</span></button>
       <button class="tool wide" data-act="bookmarks" title="Bookmarks shown in the reader's side panel"><i data-icon="bookmark"></i><span>Bookmarks</span></button>
     </div>
@@ -189,6 +191,7 @@
       <input id="replInput" type="text" placeholder="Replace with…">
       <button class="btn line" data-act="repl1" title="Replace this match">Replace</button>
       <button class="btn line" data-act="replall" title="Replace every match">All</button>
+      <button class="btn line" data-act="redactall" title="Black out every match — removed from the file when you save">Black out all</button>
     </div>
   </div>
 
@@ -337,6 +340,7 @@
 <script src="lib/pdf.min.js"></script>
 <script src="lib/pdf-lib.min.js"></script>
 <script src="js/app.js"></script>
+<script src="js/native.js"></script>
 <script src="js/ocr.js"></script>
 <script src="js/insert.js"></script>
 <script src="js/imaging.js"></script>

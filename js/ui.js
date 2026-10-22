@@ -23,7 +23,10 @@ setAccent(store.get('xd3.accent')); themeIcon();
 /* ───────── hosted copy: works offline after the first visit and can be installed like an app; ?selftest=1 runs the checks ───────── */
 const params = new URLSearchParams(location.search);
 if (params.has('selftest')) { const s = document.createElement('script'); s.src = 'tests/selftest.js'; document.head.appendChild(s); }
-else if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { /* not available on this host */ });
+else if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {}); // a copy run on this computer is always current — no offline cache to go stale
+  else navigator.serviceWorker.register('sw.js').catch(() => { /* not available on this host */ });
+}
 
 /* ───────── notification panel (the bell) ───────── */
 const ICON = { success: 'check', error: 'x', warn: 'info', info: 'info' };

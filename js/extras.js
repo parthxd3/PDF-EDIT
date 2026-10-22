@@ -195,10 +195,37 @@ $('#welcome').addEventListener('click', async e => {
 renderRecent();
 X.noteRecent = noteRecent;
 
+/* ───────── links and cropping ───────── */
+async function linkDlg(p, o, isNew) {
+  const pi = o.page ? S.pages.findIndex(q => q.id === o.page) + 1 : '';
+  const r = await dialog(isNew ? 'Add link' : 'Edit link', `
+    <label>Link to<select name="kind"><option value="url"${o.page ? '' : ' selected'}>A website or e-mail</option><option value="page"${o.page ? ' selected' : ''}>A page in this document</option></select></label>
+    <label>Web address (https://… or mailto:…)<input type="text" name="url" value="${esc(o.url || '')}" placeholder="https://example.com" autocomplete="off"></label>
+    <label>Page number (1–${S.pages.length})<input type="number" name="page" min="1" max="${S.pages.length}" value="${pi}"></label>
+    <p class="mut">The box stays invisible in the saved PDF; clicking it in any reader follows the link.</p>`, { ok: isNew ? 'Add link' : 'Save' });
+  if (!r) { if (isNew) { p.objs = p.objs.filter(x => x !== o); X.select(null); X.drawObjs(p); } return; }
+  if (r.kind === 'page') { const n = clamp(+r.page || 1, 1, S.pages.length); o.page = S.pages[n - 1].id; o.url = ''; }
+  else { let u = r.url.trim(); if (!u) return toast('Type a web address', true); if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = (/@/.test(u) && !/\//.test(u) ? 'mailto:' : 'https://') + u; o.url = u; delete o.page; }
+  if (!isNew) X.pushUndo(); X.drawObjs(p); toast('Link saved — it works in the PDF you save');
+}
+async function cropDlg(p, b) {
+  const x = clamp(b.x, 0, p.w), y = clamp(b.y, 0, p.h), box = { x, y, w: Math.min(b.x + b.w, p.w) - x, h: Math.min(b.y + b.h, p.h) - y };
+  if (box.w < 20 || box.h < 20) return toast('Drag a larger box to crop');
+  const r = await dialog('Crop pages', `<p>Keep only the marked area (${Math.round(box.w)} × ${Math.round(box.h)} pt). The rest is hidden in every PDF reader; nothing is cut out of the file.</p>
+    <label>Apply to<select name="scope"><option value="this">This page</option><option value="all">All pages</option><option value="same">All pages of the same size</option></select></label>`, { ok: 'Crop' });
+  if (!r) return; X.pushUndo(); let n = 0;
+  for (const q of S.pages) {
+    if (r.scope === 'this' ? q !== p : r.scope === 'same' ? Math.abs(q.w - p.w) > 1 || Math.abs(q.h - p.h) > 1 : false) continue;
+    const cx = Math.min(box.x, q.w - 20), cy = Math.min(box.y, q.h - 20); q.crop = { x: cx, y: cy, w: Math.min(box.w, q.w - cx), h: Math.min(box.h, q.h - cy) }; X.drawObjs(q); n++;
+  }
+  X.setTool('select'); toast(`Cropped ${n} page(s) — right-click a page and choose Remove crop to undo it`);
+}
+X.ACT.linktool = () => X.setTool('link'); X.ACT.croptool = () => X.setTool('crop');
+
 X.NO_DOC.add('batch'); X.NO_DOC.add('annots');
 X.ACT.annots = () => { const on = localStorage.getItem('xd3.annots') === 'off'; try { localStorage.setItem('xd3.annots', on ? 'on' : 'off'); } catch (e) { /* not remembered */ } syncAnnots(); toast(on ? 'Shapes, highlights and notes will be saved as PDF comments' : 'Shapes, highlights and notes will be saved as flat page content'); };
 function syncAnnots() { let on = true; try { on = localStorage.getItem('xd3.annots') !== 'off'; } catch (e) { /* default */ } $$('[data-act=annots]').forEach(b => b.classList.toggle('on', on)); }
 syncAnnots();
 Object.assign(X.ACT, { ocrall: makeSearchable, bookmarks: bookmarksDlg, compare: compareDlg, batch: batchDlg });
-Object.assign(X, { readOutline, writeOutline, makeSearchable, compareWith, batchOne });
+Object.assign(X, { linkDlg, cropDlg, readOutline, writeOutline, makeSearchable, compareWith, batchOne });
 })();

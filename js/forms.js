@@ -37,6 +37,7 @@ async function fillField(p, f) { // click on a field → a text object sized to 
   if (f.check || f.radio) { const b = X.bbox(o); o.x = f.x + (f.w - b.w) / 2; o.y = f.y + (f.h - b.h) / 2; }
   else if (f.multi) { o.x = f.x + 2; o.y = f.y + 1; }
   else { o.x = f.x + 2; o.y = f.y + f.h / 2 + size * 0.35 - X.baseOff(o); } // sits on the field's centre line
+  o.field = { name: f.name, kind: f.check ? 'check' : f.radio ? 'radio' : f.options && f.options.length ? 'choice' : 'text', on: f.on, rect: f.rect }; // (saved into the real field when the file is edited in place)
   p.filled = [...(p.filled || []), f.rect]; p.objs.push(o);
   if (f.check || f.radio) { X.pushUndo(before); X.drawObjs(p); X.drawTI(p); }
   else X.startEdit(p, o, before, !!text);
