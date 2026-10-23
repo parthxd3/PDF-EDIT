@@ -40,7 +40,9 @@
   <div class="spacer"></div>
   <span id="fileName"></span>
   <button class="btn cmdk" data-act="palette" title="Search every command (Ctrl+K)"><i data-icon="bolt"></i><span>Search commands</span><kbd>Ctrl K</kbd></button>
+  <button class="btn" data-act="writer" title="Writing tools — spelling, grammar, humanize, readability (Word, text or this PDF)"><i data-icon="spell"></i><span>Write</span></button>
   <button class="btn" data-act="reader" title="Reading mode — a clean viewer with selectable text, links and bookmarks (Esc to return)"><i data-icon="book"></i><span>Read</span></button>
+  <button class="btn ico readonly" data-act="spread" title="Two pages side by side"><i data-icon="spread"></i></button>
   <button class="btn ico readonly" data-act="night" title="Night colours"><i data-icon="moon"></i></button>
   <button class="btn ico readonly" data-act="fullscreen" title="Full screen"><i data-icon="expand"></i></button>
   <button class="btn ico" data-act="find" title="Find (Ctrl+F)"><i data-icon="search"></i></button>
@@ -120,6 +122,7 @@
       <button class="tool wide" data-act="pdf2img" title="PDF → PNG / JPG images"><i data-icon="image"></i><span>To images</span></button>
       <button class="tool wide" data-act="imgpages" title="Images → PDF pages"><i data-icon="image"></i><span>From images</span></button>
       <button class="tool wide" data-act="exporttxt" title="Export all text as a .txt file"><i data-icon="text"></i><span>To text</span></button>
+      <button class="tool wide" data-act="writer" title="Check spelling and grammar, humanize the wording (Word, text or this PDF)"><i data-icon="spell"></i><span>Spelling &amp; grammar</span></button>
       <span class="sep"></span>
       <button class="tool wide" data-act="compress" title="Make the PDF smaller — text stays selectable"><i data-icon="compress"></i><span>Compress</span></button>
       <button class="tool wide" data-act="splitzip" title="Split into single-page PDFs (ZIP)"><i data-icon="split"></i><span>Split</span></button>
@@ -207,6 +210,8 @@
       </div>
       <div class="heroact">
         <button class="btn primary" data-act="open"><i data-icon="folder"></i><span>Open file</span></button>
+        <button class="btn" data-act="viewpdf" title="Open a PDF just to read it"><i data-icon="eye"></i><span>View PDF</span></button>
+        <button class="btn" data-act="writer" title="Spelling, grammar, humanize and readability for Word and text files"><i data-icon="spell"></i><span>Writing tools</span></button>
         <button class="btn" data-act="mergedlg"><i data-icon="merge"></i><span>Merge files</span></button>
         <button class="btn" data-act="scan"><i data-icon="scan"></i><span>Scan document</span></button>
         <button class="btn" data-act="newdoc"><i data-icon="plus"></i><span>New blank PDF</span></button>
@@ -216,6 +221,7 @@
         <div><i data-icon="edittext"></i><b>Edit text</b><span>Rewrite any text in its original font — even in scans and pictures (offline OCR) — fill in forms, find &amp; replace</span></div>
         <div><i data-icon="editobj"></i><b>Edit objects</b><span>Move, resize, rotate, align or delete anything on the page</span></div>
         <div><i data-icon="merge"></i><b>Merge &amp; rearrange</b><span>Combine PDF, Word and images; drag pages into order, replace, resize, number</span></div>
+        <div><i data-icon="spell"></i><b>Write better</b><span>Spelling, grammar, humanize and readability for Word, text and PDFs — all offline</span></div>
         <div><i data-icon="word"></i><b>Convert</b><span>PDF ⇄ Word, PDF → images, images → PDF, export text</span></div>
         <div><i data-icon="compress"></i><b>Compress</b><span>Shrink PDFs while keeping text selectable</span></div>
         <div><i data-icon="lock"></i><b>Protect</b><span>Password-protect with AES encryption, permanent redaction</span></div>
@@ -331,7 +337,7 @@
 <div id="busy" hidden><div class="busycard"><div class="spin"></div><span id="busyTxt">Working…</span></div></div>
 <div id="palette" hidden><div class="pbox"><input id="palInput" type="text" placeholder="Type a command…  e.g. merge, rotate, password" autocomplete="off" spellcheck="false"><div class="plist" id="palList"></div><div class="pfoot"><span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>Enter</kbd> run</span><span><kbd>Esc</kbd> close</span></div></div></div>
 
-<input type="file" id="fOpen" accept="application/pdf,image/*,.docx" multiple hidden>
+<input type="file" id="fOpen" accept="application/pdf,image/*,.docx,.txt,.md" multiple hidden>
 <input type="file" id="fMerge" accept="application/pdf,image/*,.docx" multiple hidden>
 <input type="file" id="fImg" accept="image/*" hidden>
 <input type="file" id="fImgPages" accept="image/*" multiple hidden>
@@ -348,6 +354,7 @@
 <script src="js/forms.js"></script>
 <script src="js/extras.js"></script>
 <script src="js/reader.js"></script>
+<script src="js/writing.js"></script>
 <script src="js/organize.js"></script>
 <script src="js/secure.js"></script>
 <script src="js/ui.js"></script>

@@ -95,8 +95,8 @@ window.addEventListener('keydown', e => {
   if (!on() || $('#dlg').open || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.target.isContentEditable) return;
   const k = e.key;
   if (k === 'Escape' && !S.editing) { e.stopImmediatePropagation(); setReader(false); }
-  else if (k === 'ArrowRight' || k === 'PageDown' && e.shiftKey) { e.preventDefault(); X.goToPage(S.cur + 1); }
-  else if (k === 'ArrowLeft' || k === 'PageUp' && e.shiftKey) { e.preventDefault(); X.goToPage(S.cur - 1); }
+  else if (k === 'ArrowRight' || k === 'PageDown' && e.shiftKey) { e.preventDefault(); X.goToPage(S.cur + (body.classList.contains('spread') ? 2 : 1)); }
+  else if (k === 'ArrowLeft' || k === 'PageUp' && e.shiftKey) { e.preventDefault(); X.goToPage(S.cur - (body.classList.contains('spread') ? 2 : 1)); }
   else if (k === 'Home') { e.preventDefault(); X.goToPage(0); } else if (k === 'End') { e.preventDefault(); X.goToPage(S.pages.length - 1); }
 }, true);
 const panel = document.createElement('div'); panel.id = 'bmPanel'; panel.hidden = true; $('#thumbs').parentNode.insertBefore(panel, $('#thumbs').nextSibling);
@@ -114,5 +114,12 @@ const tabs = document.createElement('div'); tabs.className = 'sbtabs'; tabs.inne
 $('#thumbs').insertBefore(tabs, $('#thumbs').firstChild); tabs.addEventListener('click', e => { const t = e.target.closest('[data-sb]'); if (t) showPanel(t.dataset.sb); });
 X.showSidePanel = showPanel;
 
-if (store.get('xd3.reader') === '1') X.onDocOpened = () => setReader(true); // the last mode is remembered: readers land in reading mode
+X.onDocOpened = () => { if (S.viewNext || store.get('xd3.reader') === '1') setReader(true); S.viewNext = false; }; // "View PDF", or the last mode remembered: readers land in reading mode
+X.ACT.viewpdf = () => { S.viewNext = true; $('#fOpen').click(); };
+X.ACT.spread = () => { // two pages side by side, sized to fit the window
+  const v = !body.classList.contains('spread'); body.classList.toggle('spread', v); $$('[data-act=spread]').forEach(b => b.classList.toggle('active', v)); store.set('xd3.spread', v ? '1' : '0');
+  const p = S.pages[S.cur]; if (p) { const [rw] = X.rdims(p); X.setZoom(v ? Math.max(0.2, (viewer.clientWidth - 70) / 2 / (rw * X.CSS_UNITS)) : X.fitZoom()); }
+};
+X.NO_DOC.add('viewpdf');
+if (store.get('xd3.spread') === '1') body.classList.add('spread');
 })();

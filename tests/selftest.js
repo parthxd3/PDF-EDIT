@@ -121,9 +121,29 @@ async function run() {
   const boxes = p.objs.filter(o => o.type === 'text' && /box$/.test(o.text)).map(o => o.text);
   ok('add text: a click while typing finishes the box and starts the next', boxes.length === 2 && boxes[1] === 'Second box', boxes.join(','));
 
+  // ── writing tools: offline spelling & grammar, humanize, Word round trip with formatting kept, fixes written back into the PDF ──
+  if (X.writing && (await fetch('tests/samples/writing.docx', { method: 'HEAD' })).ok) {
+    const WR = X.writing, W = WR.W, settle = async () => { await sleep(200); for (let k = 0; k < 100 && W.busyLint; k++) await sleep(100); };
+    X.ACT.writer(); await WR.openFile(new File([await (await fetch('tests/samples/writing.docx')).blob()], 'writing.docx')); await settle();
+    const found = W.paras.flatMap(q => (q.issues || []).map(i => i.word));
+    ok('writing: spelling and grammar found offline', ['Quartely', 'importent', 'sentense', 'The the'].every(w => found.includes(w)), found.join(', '));
+    for (let k = 0; k < 12; k++) { const btn = document.querySelector('#wrPane .wcard .wps button'); if (!btn) break; btn.click(); await sleep(150); } await settle();
+    const xml = await (await (await X.loadLib('jszip')).loadAsync(await WR.buildDocx())).file('word/document.xml').async('string');
+    ok('writing: Word file fixed with its formatting kept', /<w:b\/><\/w:rPr><w:t[^>]*>important<\/w:t>/.test(xml) && /Quarterly Report/.test(xml) && /<w:i\/><\/w:rPr><w:t[^>]*>utilize<\/w:t>/.test(xml) && /Heading1/.test(xml));
+    const rw = WR.rewrites('natural').map(r => r.from + '>' + r.to);
+    ok('writing: humanize suggests natural wording', ['Furthermore>Also', 'utilize>use', 'in order to>to'].every(x => rw.includes(x)), rw.join(' | '));
+    W.paras[3].text = "The report isn't finished and we can't wait."; const fm = WR.rewrites('formal').filter(r => r.i === 3).map(r => r.to).join(','); ok('writing: formal tone expands contractions', fm === 'is not,cannot', fm);
+    WR.close(); p = await load('native.pdf'); X.ACT.writer(); document.querySelector('[data-w=pdf]').click(); await settle(); await settle();
+    const q = W.paras.find(x => /lazy dog/.test(x.text)); q.text = q.text.replace('lazy dog', 'sleepy dog'); await WR.applyToPdf(); WR.close();
+    tx = await textOf(await reopen(await X.buildPdf(S.pages)));
+    ok('writing: fix written back into the PDF in its own font', /sleepy dog/.test(tx) && !/lazy dog/.test(tx) && /running through the quiet forest/.test(tx));
+  }
+  // ── viewing: two pages side by side ──
+  X.ACT.spread(); ok('view: two pages side by side', document.body.classList.contains('spread')); X.ACT.spread();
+
   // ── session round trip ──
   await X.openFiles; S.dirty = true; X.scheduleSave(); await sleep(7000); await X.ACT.restore(); await sleep(300);
-  ok('session: restored with edits', S.pages.length === 2 && S.pages[0].objs.some(o => o.text === 'Second box'), S.pages[0] && S.pages[0].objs.length);
+  ok('session: restored with edits', S.pages.length === 2 && S.pages[0].objs.some(o => /sleepy dog/.test(o.text || '')), S.pages[0] && S.pages[0].objs.length);
 }
 window.__selftest = run().catch(e => { ok('suite crashed', false, e && e.stack || e); }).then(() => {
   const fails = results.filter(r => !r.ok), secs = ((performance.now() - t0) / 1000).toFixed(1);

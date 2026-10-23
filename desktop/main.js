@@ -7,7 +7,7 @@ const ROOT = path.join(__dirname, 'www');
 const OPENABLE = /\.(pdf|docx|png|jpe?g|gif|bmp|webp)$/i;
 const fileArg = (process.argv.slice(1).find(a => OPENABLE.test(a) && !a.startsWith('-')) || '');
 
-protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);
+protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } }]);
 
 function createWindow() {
   const win = new BrowserWindow({

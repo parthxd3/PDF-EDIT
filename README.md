@@ -23,6 +23,11 @@ web app, or as a Windows program — and nothing is ever uploaded.
 - **Protect** — AES password protection, permanent redaction (flatten).
 - **Insert** — images, signatures (drawn or typed), stamps, dates, watermarks; scan with the camera.
 - **Links and crop** — add links to web pages or other pages; crop pages (one, all, or all of the same size).
+- **Writing tools** — spelling and grammar checking (Harper, fully offline; US, UK, Canadian, Australian and Indian English), clarity
+  hints (long sentences, passive voice, weak words, clichés), *Humanize* rewrites in a natural, casual or formal tone, readability statistics
+  and text clean-up — for Word files (formatting kept: each fix goes into its own run), text files, pasted text and the open PDF (fixes are
+  written back in the PDF's own font). Your dictionary is kept on the device.
+- **View** — *View PDF* opens a file straight into reading mode; two pages side by side.
 - **Read** — a reading mode with selectable text, clickable links, bookmarks in the side panel, night colours and full screen; select text to highlight, comment or copy it. Recently opened files are one click away on the start screen.
 
 ## Running it
@@ -51,9 +56,10 @@ js/forms.js           form filling          js/extras.js   searchable PDF, bookm
 js/insert.js          stamps, watermark, page numbers, signature
 js/imaging.js         image filters, background remover, scanner
 js/convert.js         Word ⇄ PDF, images, compress, flatten        js/secure.js   password protection
-js/reader.js          reading mode (text layer, links, bookmarks panel, night, selection pop-up)
+js/reader.js          reading mode (text layer, links, bookmarks panel, night, selection pop-up, two-page view)
+js/writing.js         writing tools: spelling, grammar, humanize, readability, text tools (Word / text / PDF)
 js/organize.js        page organizer        js/ui.js       theme, notifications, command palette, service worker
-lib/                  pdf.js, pdf-lib, fontkit, JSZip, fonts, OCR engine + language data (all bundled, no CDN)
+lib/                  pdf.js, pdf-lib, fontkit, JSZip, fonts, OCR engine + language data, Harper grammar checker (all bundled, no CDN)
 desktop/              Electron shell for the Windows build
 sw.js, manifest.webmanifest, icons/   installable offline web app
 .htaccess             hosting settings (caching, MIME types, security headers)
@@ -62,5 +68,5 @@ sw.js, manifest.webmanifest, icons/   installable offline web app
 ## Licences
 
 The editor is © XDCybertech Pvt Ltd. Bundled components: pdf.js (Apache 2.0), pdf-lib and fontkit (MIT), JSZip (MIT), Tesseract.js and
-Tesseract language data (Apache 2.0), fonts from Google Fonts (SIL OFL, Apache 2.0, Ubuntu Font Licence) and DejaVu (Bitstream Vera
+Tesseract language data (Apache 2.0), Harper grammar checker (Apache 2.0, lib/harper/LICENSE), fonts from Google Fonts (SIL OFL, Apache 2.0, Ubuntu Font Licence) and DejaVu (Bitstream Vera
 licence) — see `lib/fonts/README.txt` and `lib/ocr/README.txt`.
