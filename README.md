@@ -35,7 +35,8 @@ web app, or as a Windows program — and nothing is ever uploaded.
 | How | Steps |
 | --- | --- |
 | On your PC (browser) | Double-click `Start PDF Editor.bat` (needs Python or Node.js) and the editor opens at `http://localhost:5391` (served by `serve.py`, which never lets the browser keep a stale copy). |
-| Windows program | `Build EXE.bat` builds a portable app for Windows 7 / 8 / 10 / 11 into `dist\`. |
+| Windows program | `Build EXE.bat` builds the app for Windows 7 / 8 / 10 / 11 (64- and 32-bit) into `dist\`: portable folders plus, in `dist\downloads`, an installer (`XD3-PDF-Editor-Setup-<version>-<arch>.exe`: shortcuts, *Open with* for PDFs, uninstaller) and a portable ZIP for each. |
+| Offer the Windows app on your website | After `Build EXE.bat`, run `Build Hostinger ZIP.bat` (it carries `downloads/manifest.json`), then upload the `.exe` / `.zip` files from `dist\downloads` into `public_html/downloads`. The site's **Download for Windows** button lists whatever is uploaded and recommends the right one for the visitor's PC. |
 | Website (Hostinger or any Apache / LiteSpeed host) | `Build Hostinger ZIP.bat` makes `dist\xd3-pdf-editor-hostinger.zip`; upload and extract it into `public_html`. The site works offline after the first visit and can be installed like an app. |
 
 ## Testing
@@ -58,6 +59,8 @@ js/imaging.js         image filters, background remover, scanner
 js/convert.js         Word ⇄ PDF, images, compress, flatten        js/secure.js   password protection
 js/reader.js          reading mode (text layer, links, bookmarks panel, night, selection pop-up, two-page view)
 js/writing.js         writing tools: spelling, grammar, humanize, readability, text tools (Word / text / PDF)
+js/download.js        "Download for Windows" dialog on the hosted site (reads downloads/manifest.json)
+desktop/builder.json  installer settings (electron-builder);  tools/make-downloads.ps1  makes the installer, portable ZIP and manifest
 js/organize.js        page organizer        js/ui.js       theme, notifications, command palette, service worker
 lib/                  pdf.js, pdf-lib, fontkit, JSZip, fonts, OCR engine + language data, Harper grammar checker (all bundled, no CDN)
 desktop/              Electron shell for the Windows build

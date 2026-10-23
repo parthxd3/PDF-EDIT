@@ -293,6 +293,15 @@ body.nosb #bmPanel { display: none; }
 .recent:hover { border-color: var(--accB); background: var(--accC); }
 .recent span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recent small { color: var(--mut); white-space: nowrap; }
+/* ── Download for Windows ── */
+.dllist { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.dlrow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel2); color: var(--txt); text-decoration: none; transition: border-color .15s, background .15s; }
+.dlrow:hover { border-color: var(--accB); background: var(--accC); }
+.dlrow.rec { border-color: var(--accB); box-shadow: 0 0 0 1px var(--accB) inset; }
+.dlrow > i[data-icon] { width: 22px; height: 22px; color: var(--acc); } .dlrow i[data-icon] svg { width: 22px; height: 22px; }
+.dlrow div { flex: 1; min-width: 0; } .dlrow b { display: block; } .dlrow small { display: block; color: var(--mut); line-height: 1.35; margin-top: 2px; }
+.dlrow em { font-style: normal; color: var(--mut); white-space: nowrap; }
+.dlrec { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: var(--accA); color: var(--acc); font-size: 11px; font-weight: 600; }
 /* ── two pages side by side ── */
 body.spread #viewer { display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 18px 14px; }
 body.spread .page { margin: 0; }

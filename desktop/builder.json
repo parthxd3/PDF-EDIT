@@ -1,0 +1,26 @@
+{
+  "appId": "in.xdcybertech.xd3pdfeditor",
+  "productName": "XD3 PDF Editor",
+  "copyright": "Copyright XDCybertech Pvt Ltd",
+  "electronVersion": "22.3.27",
+  "win": {
+    "icon": "icon.ico",
+    "publisherName": "XDCybertech Pvt Ltd"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowElevation": true,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "XD3 PDF Editor",
+    "uninstallDisplayName": "XD3 PDF Editor",
+    "installerIcon": "icon.ico",
+    "uninstallerIcon": "icon.ico",
+    "artifactName": "XD3-PDF-Editor-Setup-${version}-${arch}.${ext}"
+  },
+  "fileAssociations": [
+    { "ext": "pdf", "name": "PDF document", "description": "PDF document", "role": "Editor", "icon": "icon.ico" }
+  ]
+}

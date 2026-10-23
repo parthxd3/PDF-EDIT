@@ -21,6 +21,8 @@ Options -Indexes
   AddType application/gzip .gz
   AddType application/manifest+json .webmanifest
   AddType application/wasm .wasm
+  AddType application/octet-stream .exe
+  AddType application/zip .zip
 </IfModule>
 
 # Send text files compressed (the OCR engine alone shrinks from 4 MB to about 1.5 MB)
@@ -45,6 +47,12 @@ Options -Indexes
     Header set Cache-Control "public, max-age=2592000"
   </FilesMatch>
 </IfModule>
+
+# The Windows installers in downloads/ are plain files to save (not shown in the browser)
+<FilesMatch "\.(exe|zip)$">
+  Header set Content-Disposition "attachment"
+  Header set Cache-Control "public, max-age=86400"
+</FilesMatch>
 
 # Nothing but the app itself is served
 <FilesMatch "(^\.|\.(bat|md|log|py)$)">

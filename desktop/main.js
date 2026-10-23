@@ -29,7 +29,7 @@ function createWindow() {
   if (process.env.XD3_SELFTEST) { // build check: load the app, report whether it started, quit
     win.webContents.once('did-finish-load', async () => {
       const r = await win.webContents.executeJavaScript(`(async () => {
-        if (window.__selftest) { const t = await window.__selftest; return JSON.stringify({ chrome: navigator.userAgent.match(/Chrome.(\d+)/)[1], ...t }); } // the full suite from tests/, when bundled
+        if (window.__selftest) { const t = await window.__selftest; return JSON.stringify({ chrome: (navigator.userAgent.match(/Chrome.(\\d+)/) || [])[1], ...t }); } // the full suite from tests/, when bundled
         await XD3.ensureFont('Roboto');
         const d = await PDFLib.PDFDocument.create(); d.addPage([200, 200]);
         const pdf = await pdfjsLib.getDocument({ data: await d.save(), isEvalSupported: false }).promise;

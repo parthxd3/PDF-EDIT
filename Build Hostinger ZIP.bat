@@ -29,6 +29,7 @@ xcopy /e /i /q /y "lib" "%STAGE%\lib" >nul
 xcopy /e /i /q /y "icons" "%STAGE%\icons" >nul
 copy /y "sw.js" "%STAGE%\" >nul
 copy /y "manifest.webmanifest" "%STAGE%\" >nul
+if exist "dist\downloads\manifest.json" ( mkdir "%STAGE%\downloads" & copy /y "dist\downloads\manifest.json" "%STAGE%\downloads\" >nul )
 if not exist "%STAGE%\lib\pdf.min.js" goto :fail
 rem (the editor's own scripts are joined into one file, so the page needs one request instead of twelve)
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools/bundle-js.ps1" "%STAGE%"
@@ -55,6 +56,14 @@ echo    4. Turn SSL on (hPanel ^> Security ^> SSL), then remove the # from the f
 echo       the camera scanner only works over https.
 echo.
 echo  To update the site later: run this file again, upload the new ZIP and extract it over the old files.
+echo.
+if exist "dist\downloads\manifest.json" (
+  echo  Windows app downloads: the site's "Download for Windows" button lists the files in dist\downloads.
+  echo  They are large, so they are NOT inside the ZIP - upload the files from  dist\downloads  into  public_html/downloads
+  echo  with the File Manager or FTP ^(the manifest.json there is already in the ZIP^). Re-upload them after each Build EXE.bat.
+) else (
+  echo  No Windows app downloads were included - run "Build EXE.bat" first if the site should offer the installer.
+)
 if not defined XD3_NOPAUSE start "" explorer "%XD3_OUT%"
 goto :end
 

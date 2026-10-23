@@ -16,6 +16,9 @@ const fontNames = async pdf => { const pg = await pdf.getPage(1), tc = await pg.
 const textOf = async (pdf, i = 1) => (await (await pdf.getPage(i)).getTextContent()).items.map(t => t.str).join(' ');
 
 async function run() {
+  // start from the default view, whatever this browser remembers from earlier use (reading mode, two pages, night colours)
+  for (const k of ['xd3.reader', 'xd3.spread', 'xd3.night']) { try { localStorage.removeItem(k); } catch (e) { /* */ } }
+  document.body.classList.remove('reader', 'spread', 'night');
   // ── native text: fonts are reused, line width kept, saved file re-embeds them ──
   let p = await load('native.pdf'), its = await items(p);
   ok('native: text lines found', its.filter(i => !i.ocr && !i.field).length >= 9, its.length);
