@@ -99,6 +99,7 @@ const ICONS = {
   bell: 'M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0', bolt: 'M13 3L5 13h6l-1 8 8-10h-6z', sun: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5',
   cut: 'M6 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM6 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM8 9l12 8M8 15L20 7', spell: 'M4 17l3-10 3 10M5 14h4M13 7h3a2 2 0 0 1 0 4h-3zM13 11h3.5a2 2 0 0 1 0 4H13zM14 19l2 2 5-5', eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z', spread: 'M3 5h8v14H3zM13 5h8v14h-8z', windows: 'M3 5.5l7.5-1v7H3zM12 4.3L21 3v8.5h-9zM3 12.5h7.5v7L3 18.5zM12 12.5h9V21l-9-1.3z', bookmark: 'M6 3h12v18l-6-4-6 4z', link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1', crop: 'M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2',
   book: 'M4 5a2 2 0 0 1 2-2h6v18H6a2 2 0 0 0-2 2zM20 5a2 2 0 0 0-2-2h-6v18h6a2 2 0 0 1 2 2z', expand: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5M9 9l-5-5M15 9l5-5M9 15l-5 5M15 15l5 5', clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 3',
+  bold: 'M7 4.5h6a3.75 3.75 0 0 1 0 7.5H7zM7 12h7a3.75 3.75 0 0 1 0 7.5H7z', italic: 'M10 4.5h8M6 19.5h8M14 4.5l-4 15', underline: 'M7 4v7a5 5 0 0 0 10 0V4M5 20.5h14', strike: 'M4 12h16M16.5 7A4.5 4.5 0 0 0 12 4.5c-2.6 0-4.3 1.4-4.3 3.3 0 1.1.6 2 1.8 2.7M7.5 17A4.8 4.8 0 0 0 12 19.5c2.7 0 4.6-1.4 4.6-3.5 0-.7-.2-1.3-.6-1.8', sup: 'M4 8l7 11M11 8l-7 11M15 4.6c.4-.9 1.2-1.6 2.3-1.6 1.2 0 2.1.8 2.1 1.9 0 1.8-4.4 2.4-4.4 4.6h4.6', sub: 'M4 5l7 11M11 5l-7 11M15 14.6c.4-.9 1.2-1.6 2.3-1.6 1.2 0 2.1.8 2.1 1.9 0 1.8-4.4 2.4-4.4 4.6h4.6', fcolor: 'M6.5 15.5L12 3.5l5.5 12M8.6 11h6.8', hlpen: 'M15 4l5 5-8.5 8.5H6.5v-5zM12.5 6.5l5 5M4 21h8', clearfmt: 'M6 4.5h12M12.5 4.5L9 15M14 15l6 6M20 15l-6 6M4 19h6', alignjust: 'M4 6h16M4 10h16M4 14h16M4 18h16', listbul: 'M9.5 6H20M9.5 12H20M9.5 18H20M4.5 6h.5M4.5 12h.5M4.5 18h.5', listnum: 'M10 6h10M10 12h10M10 18h10M4 4.5h1.4V9M3.8 9h3M4 14.2a1.4 1.4 0 0 1 2.7.5c0 1.2-2.8 1.6-2.8 3.3h2.9', indent: 'M4 5h16M11 10h9M11 14h9M4 19h16M4 9.5l3.5 2.5L4 14.5', outdent: 'M4 5h16M11 10h9M11 14h9M4 19h16M7.5 9.5L4 12l3.5 2.5', linesp: 'M11 6h9M11 12h9M11 18h9M5.5 4v16M3 6.5l2.5-2.5L8 6.5M3 17.5L5.5 20 8 17.5', table: 'M3.5 5h17v14h-17zM3.5 10h17M3.5 15h17M9.2 5v14M14.8 5v14', pbreak: 'M6 3v5h12V3M6 21v-5h12v5M3 12h2.5M8 12h3M13 12h3M18.5 12H21', pagesetup: 'M6 3h9l4 4v14H6zM15 3v4h4M9 11h6M9 15h6', pilcrow: 'M13 4v16M17 4v16M19 4H9.5a4.5 4.5 0 0 0 0 9H13', toc: 'M4 6h16M7 10h13M10 14h10M7 18h13', hf: 'M5 3h14v18H5zM5 7h14M5 17h14', omega: 'M5 19h4.5v-2.2A6.5 6.5 0 1 1 14.5 16.8V19H19',
 };
 const HINTS = {
   select: 'Click to select · drag to move · corner handles resize · top handle rotates · Shift+click or drag a box to select several · double‑click text to edit',
@@ -286,9 +287,10 @@ function imagePage(im) {
 }
 const isPdf = f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
 const isDocx = f => /\.docx$/i.test(f.name);
-async function openFiles(files, append) {
+async function openFiles(files, append, opt = {}) {
   if ([...files].some(f => /\.doc$/i.test(f.name))) toast('Old .doc files are not supported — save as .docx in Word first', true);
   const texts = [...files].filter(f => /\.(txt|md)$/i.test(f.name)); if (texts.length && window.XD3.openInWriter) { window.XD3.openInWriter(texts[0]); if (texts.length === files.length) return; }
+  if (!append && !opt.convert && files.length === 1 && isDocx(files[0]) && window.XD3.docx) return window.XD3.docx.openFile(files[0]); // a Word file opens in the Word editor (Word → PDF converts it)
   files = [...files].filter(f => isPdf(f) || isDocx(f) || f.type.startsWith('image/'));
   if (!files.length) return toast('Please choose PDF, Word (.docx) or image files', true);
   if (!append && S.dirty && S.pages.length && !confirm('Discard unsaved changes and open a new document?')) return;
@@ -1313,10 +1315,10 @@ const appMenu = () => S.pages.length ? [
   mi('Open…', 'folder', 'open', { key: 'Ctrl+O' }), mi('Add files…', 'merge', 'merge'), mi('Save PDF', 'download', 'save', { key: 'Ctrl+S' }), mi('Print…', 'print', 'print', { key: 'Ctrl+P' }), '-', ...editItems(), '-',
   { label: 'Insert', icon: 'plus', sub: insertSub() }, { label: 'Tools', icon: 'cursor', sub: toolsSub() }, { label: 'This page', icon: 'pages', sub: pageSub() }, mi('Organize pages…', 'grid', 'organize', { key: 'G' }),
   { label: 'Zoom & view', icon: 'zoomin', sub: zoomSub() }, { label: 'Convert & protect', icon: 'word', sub: convertSub() }, '-',
-  mi('Writing tools (spelling, grammar, humanize)…', 'spell', 'writer'), mi('Reading mode', 'book', 'reader', { checked: document.body.classList.contains('reader') }), mi('Two pages side by side', 'spread', 'spread', { checked: document.body.classList.contains('spread') }), mi('Night colours', 'moon', 'night', { checked: document.body.classList.contains('night') }), mi('Full screen', 'expand', 'fullscreen'), '-',
-  mi('Document properties…', 'info', 'props'), mi('Keyboard shortcuts', 'key', 'shortcuts'), mi('About', 'info', 'about'),
+  mi('Writing tools (spelling, grammar, humanize)…', 'spell', 'writer'), mi('Word editor (.docx)…', 'word', 'dx'), mi('Reading mode', 'book', 'reader', { checked: document.body.classList.contains('reader') }), mi('Two pages side by side', 'spread', 'spread', { checked: document.body.classList.contains('spread') }), mi('Night colours', 'moon', 'night', { checked: document.body.classList.contains('night') }), mi('Full screen', 'expand', 'fullscreen'), '-',
+  mi('Document properties…', 'info', 'props'), window.xd3desk && mi('Default PDF app…', 'windows', 'defapp'), mi('Keyboard shortcuts', 'key', 'shortcuts'), mi('About', 'info', 'about'),
 ] : [
-  mi('Open file…', 'folder', 'open', { key: 'Ctrl+O' }), mi('View a PDF…', 'eye', 'viewpdf'), mi('Writing tools…', 'spell', 'writer'), mi('Merge files…', 'merge', 'mergedlg'), mi('Download for Windows…', 'windows', 'dlwin'), mi('Scan document…', 'scan', 'scan'), mi('Word → PDF…', 'word', 'docx2pdf'), mi('New blank PDF', 'plus', 'newdoc'),
+  mi('Open file…', 'folder', 'open', { key: 'Ctrl+O' }), mi('View a PDF…', 'eye', 'viewpdf'), mi('Word editor (.docx)…', 'word', 'dx'), mi('Writing tools…', 'spell', 'writer'), mi('Merge files…', 'merge', 'mergedlg'), /^https?:$/.test(location.protocol) && mi('Download for Windows…', 'windows', 'dlwin'), window.xd3desk && mi('Default PDF app…', 'windows', 'defapp'), mi('Scan document…', 'scan', 'scan'), mi('Word → PDF…', 'word', 'docx2pdf'), mi('New blank PDF', 'plus', 'newdoc'),
   !$('#bRestore').hidden && mi('Restore last session', 'undo', 'restore'), '-', mi('Light / dark theme', 'moon', 'theme'), mi('Keyboard shortcuts', 'key', 'shortcuts'), mi('About', 'info', 'about'),
 ];
 function onContext(e, pid) { // right-click on a page: the object under the pointer, or the page itself
@@ -1848,6 +1850,7 @@ function updateUI() {
   if (document.activeElement !== $('#pageNo')) $('#pageNo').value = has ? S.cur + 1 : 0;
   $('#pageNo').max = S.pages.length; $('#pageCnt').textContent = '/ ' + S.pages.length;
   $('#fileName').textContent = has ? S.fileName + (S.dirty ? ' •' : '') : '';
+  if (!document.body.classList.contains('dxopen')) document.title = has ? S.fileName + (S.dirty ? ' •' : '') + ' — XD3 PDF Editor' : 'XD3 PDF Editor — Free PDF Editor by XD3Labs'; // (the window title in the desktop app)
   const sel = !!selObjs(); $$('.selonly').forEach(b => b.disabled = !sel);
   const cur = S.pages[S.cur];
   $$('.thumb', thumbs).forEach(t => { const on = cur && t.dataset.id === cur.id; if (on && !t.classList.contains('active')) t.scrollIntoView({ block: 'nearest' }); t.classList.toggle('active', !!on); });
@@ -1933,7 +1936,7 @@ const onFiles = (sel, fn) => $(sel).addEventListener('change', e => { const f = 
 onFiles('#fOpen', f => openFiles(f, false));
 onFiles('#fMerge', f => openFiles(f, S.pages.length > 0));
 onFiles('#fImgPages', f => openFiles(f, S.pages.length > 0));
-onFiles('#fDocx', f => openFiles(f, false).then(() => { if (S.pages.length) toast('Word document converted — review it, then click Save PDF'); }));
+onFiles('#fDocx', f => openFiles(f, false, { convert: true }).then(() => { if (S.pages.length) toast('Word document converted — review it, then click Save PDF'); }));
 onFiles('#fImg', f => busy(async () => { const im = await readImage(f[0]); insertImage(im.url, im.w * 0.75, im.h * 0.75); }));
 
 // drag & drop files
@@ -2003,9 +2006,10 @@ DB.get('session').then(s => { if (s && s.pages && s.pages.length) { const b = $(
 $('#yr').textContent = new Date().getFullYear();
 $('#hint').textContent = HINTS.select;
 buildFontMenu(); icons(); syncControls(); updateUI();
-const openArg = new URLSearchParams(location.search).get('open'); // desktop app: a file passed on the command line ("Open with…")
-if (openArg) fetch('__open__/' + encodeURIComponent(openArg)).then(r => r.blob())
-  .then(b => openFiles([new File([b], openArg, { type: /\.pdf$/i.test(openArg) ? 'application/pdf' : b.type })], false)).catch(() => toast('Could not open ' + openArg, true));
+const qs = new URLSearchParams(location.search), openArg = qs.get('open'), openTok = qs.get('f'); // desktop app: a file passed on the command line (double-click, "Open with…")
+if (openArg) addEventListener('DOMContentLoaded', () => fetch('__open__/' + (openTok ? openTok + '/' : '') + encodeURIComponent(openArg)).then(r => { if (!r.ok) throw new Error('missing'); return r.blob(); }) // (after every script has run — the Word editor and reader come later in the page)
+  .then(b => { const f = new File([b], openArg, { type: /\.pdf$/i.test(openArg) ? 'application/pdf' : b.type }); if (isPdf(f) && (!window.XD3.shellView || window.XD3.shellView())) S.viewNext = true; return openFiles([f], false); }) // (a PDF from File Explorer opens in reading view)
+  .catch(() => toast('Could not open ' + openArg, true)));
 // shared API for the feature modules (imaging.js, convert.js, organize.js) and for automation
 window.XD3 = { S, PE, ACT, NO_DOC, HINTS, A4, CSS_UNITS, LH, BASE, viewer, $, $$, svg, uid, clone, clamp, esc, toast, busy, dialog, download, icons,
   pushUndo, snap, resetDoc, scheduleSave, buildPages, layout, drawObjs, drawSel, select, selObjs, selOne, setTool, syncControls, updateUI, goToPage, fitZoom, setZoom,

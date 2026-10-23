@@ -11,6 +11,14 @@ class Handler(SimpleHTTPRequestHandler):
         super().end_headers()
     def log_message(self, fmt, *args):  # keep the window quiet
         pass
+    def do_PUT(self):  # the self-test drops files it saved into tests/out/ (only there), so Word can check them
+        import os, re
+        name = self.path.split('?')[0]
+        if not re.fullmatch(r'/tests/out/[\w.-]+', name):
+            self.send_error(403); return
+        os.makedirs('tests/out', exist_ok=True)
+        with open(name.lstrip('/'), 'wb') as f: f.write(self.rfile.read(int(self.headers.get('Content-Length', 0))))
+        self.send_response(204); self.end_headers()
 
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 5391
 ThreadingHTTPServer(('127.0.0.1', port), Handler).serve_forever()

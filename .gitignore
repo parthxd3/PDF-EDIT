@@ -6,3 +6,4 @@ node_modules/
 Thumbs.db
 desktop.ini
 downloads/
+tests/out/

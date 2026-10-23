@@ -39,7 +39,7 @@ X.onPageVisible = p => { if (on()) layers(p); };
 /* ───────── the mode itself ───────── */
 function setReader(v) {
   body.classList.toggle('reader', v); store.set('xd3.reader', v ? '1' : '0');
-  $$('[data-act=reader]').forEach(b => b.classList.toggle('active', v));
+  $$('[data-act=reader]').forEach(b => { b.classList.toggle('active', v); const s = $('span', b), i = $('i[data-icon]', b); if (s) s.textContent = v ? 'Edit' : 'Read'; if (i && i.dataset.icon !== (v ? 'edittext' : 'book')) { i.dataset.icon = v ? 'edittext' : 'book'; i.textContent = ''; icons(b); } b.title = v ? 'Edit this PDF — leave reading mode (Esc)' : 'Reading mode — a clean viewer with selectable text, links and bookmarks (Esc to return)'; }); // (in reading view the button is the way to editing)
   if (v) { X.commitEdit(); X.setTool('hand'); X.select(null); X.visible.forEach(id => { const p = S.pages.find(q => q.id === id); if (p) layers(p); }); viewer.focus(); $('#hint').textContent = 'Reading mode — select text to highlight or copy it · click links · ← → change page · Esc returns to editing'; }
   else { hidePop(); X.setTool('select'); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); }
 }

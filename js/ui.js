@@ -79,6 +79,6 @@ list.addEventListener('mousemove', e => { const it = e.target.closest('.pitem');
 list.addEventListener('click', e => { const it = e.target.closest('.pitem'); if (it) run(+it.dataset.i); });
 pal.addEventListener('mousedown', e => { if (e.target === pal) closePal(); });
 window.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); e.stopImmediatePropagation(); if (pal.hidden) { if (!$('#dlg').open) openPal(); } else closePal(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && !document.body.classList.contains('dxopen')) { e.preventDefault(); e.stopImmediatePropagation(); if (pal.hidden) { if (!$('#dlg').open) openPal(); } else closePal(); }
 }, true);
 })();

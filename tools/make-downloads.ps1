@@ -26,7 +26,7 @@ foreach ($arch in $Arches.Split(' ', [StringSplitOptions]::RemoveEmptyEntries)) 
 
   Write-Host "  - $arch portable ZIP"
   $zip = Join-Path $dl "XD3-PDF-Editor-Portable-$version-$arch.zip"
-  if (Test-Path $zip) { Remove-Item -Force $zip }
+  Get-ChildItem $dl -Filter "XD3-PDF-Editor-Portable-*-$arch.zip" -ErrorAction SilentlyContinue | Remove-Item -Force # (older versions too)
   $z = [IO.Compression.ZipFile]::Open($zip, 'Create')
   try {
     $top = "XD3 PDF Editor"

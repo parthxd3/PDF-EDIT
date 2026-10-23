@@ -26,6 +26,8 @@ echo  [1/3] Preparing app files...
 if exist "%STAGE%" rmdir /s /q "%STAGE%"
 mkdir "%STAGE%\www"
 copy /y "desktop\main.js" "%STAGE%\" >nul
+copy /y "desktop\preload.js" "%STAGE%\" >nul
+copy /y "desktop\winreg.js" "%STAGE%\" >nul
 copy /y "desktop\package.json" "%STAGE%\" >nul
 copy /y "index.html" "%STAGE%\www\" >nul
 xcopy /e /i /q /y "css" "%STAGE%\www\css" >nul
@@ -59,7 +61,7 @@ echo.
 echo  Each folder is a complete portable app: copy or zip the WHOLE folder to share it. No installation needed.
 echo.
 echo  Files to give people (also offered by the website's "Download for Windows" button):
-echo    %XD3_OUT%\downloads\XD3-PDF-Editor-Setup-*.exe       installer (shortcuts, Open with for PDFs)
+echo    %XD3_OUT%\downloads\XD3-PDF-Editor-Setup-*.exe       installer (shortcuts, Open with for PDF and Word files)
 echo    %XD3_OUT%\downloads\XD3-PDF-Editor-Portable-*.zip    unzip and run, no installation
 echo  Run "Build Hostinger ZIP.bat" afterwards to put them on your website.
 if not defined XD3_NOPAUSE start "" explorer "%XD3_OUT%"

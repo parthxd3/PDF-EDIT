@@ -18,9 +18,7 @@
     "uninstallDisplayName": "XD3 PDF Editor",
     "installerIcon": "icon.ico",
     "uninstallerIcon": "icon.ico",
+    "include": "installer.nsh",
     "artifactName": "XD3-PDF-Editor-Setup-${version}-${arch}.${ext}"
-  },
-  "fileAssociations": [
-    { "ext": "pdf", "name": "PDF document", "description": "PDF document", "role": "Editor", "icon": "icon.ico" }
-  ]
+  }
 }

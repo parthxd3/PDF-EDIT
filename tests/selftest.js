@@ -144,6 +144,63 @@ async function run() {
   // ── viewing: two pages side by side ──
   X.ACT.spread(); ok('view: two pages side by side', document.body.classList.contains('spread')); X.ACT.spread();
 
+  // ── Word editor: a full document opens, saves untouched run for run, edits land in the file, Fix Formatting and Auto Format ──
+  if (X.docx && (await fetch('tests/samples/complex.docx', { method: 'HEAD' })).ok) {
+    const DX = X.docx, JSZip = await X.loadLib('jszip'), WNS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main', ser = new XMLSerializer();
+    const sample = async n => new File([await (await fetch('tests/samples/' + n, { cache: 'no-store' })).blob()], n);
+    const docXml = async blob => (await JSZip.loadAsync(blob)).file('word/document.xml').async('string');
+    const runsSig = xml => { // every paragraph as its formatted pieces of text (runs with the same formatting side by side count as one)
+      const d = new DOMParser().parseFromString(xml, 'application/xml'), clean = s => s.replace(/ xmlns(:\w+)?="[^"]*"/g, '').replace(/ w:rsid\w*="[^"]*"/g, '');
+      return [...d.getElementsByTagNameNS(WNS, 'p')].map(p => { const out = []; for (const r of p.getElementsByTagNameNS(WNS, 'r')) { const rp = [...r.children].find(c => c.localName === 'rPr'), k = rp ? clean(ser.serializeToString(rp)) : '', t = [...r.children].filter(c => c.localName !== 'rPr').map(c => c.localName === 't' ? c.textContent : '<' + c.localName + '>').join(''); const last = out[out.length - 1]; if (last && last[0] === k) last[1] += t; else out.push([k, t]); } return JSON.stringify(out); });
+    };
+    const P = () => DX.allParas(), find = t => P().findIndex(p => DX.ptext(p).startsWith(t)), wait = sleep;
+    DX.D.dirty = false; await DX.openFile(await sample('complex.docx')); const dxDoc = document.querySelector('#dxDoc');
+    ok('word: full document opens', P().length > 30 && dxDoc.querySelectorAll('table.dx-t').length === 1 && dxDoc.querySelectorAll('.dx-img img').length === 1 && dxDoc.querySelector('.dx-txbx') && document.querySelector('#dxHdr').textContent.includes('XD3 Test Header') && P().some(p => p.dataset.label === '2.'), `${P().length} paragraphs`);
+    const orig = await docXml(await sample('complex.docx')), same = await docXml(await DX.buildDocx()), A = runsSig(orig), B = runsSig(same);
+    const diff = A.map((s, i) => s === B[i] ? null : i).filter(i => i !== null);
+    ok('word: untouched save keeps every run and paragraph', A.length === B.length && !diff.length, `${A.length}/${B.length} ${diff.slice(0, 3).map(i => B[i]).join(' ')}`);
+    let i = find('This report has'); DX.setSel({ a: [i, 5], b: [i, 11] }); DX.setRunProp('b', true, true);
+    i = find('Between the lists'); DX.setSel({ a: [i, 0], b: [i, 0] }); DX.setStyle('heading 2');
+    i = find('Third bullet'); DX.setSel({ a: [i, 12], b: [i, 12] }); document.execCommand('insertParagraph'); await wait(30); document.execCommand('insertText', false, 'Fourth bullet'); await wait(30);
+    i = find('Text on the second page'); DX.setSel({ a: [i, 24], b: [i, 24] }); document.execCommand('insertParagraph'); await wait(30);
+    i = find('A sentence with a'); DX.setSel({ a: [i, 0], b: [i, 26] }); document.execCommand('delete'); await wait(50);
+    let x = await docXml(await DX.buildDocx());
+    ok('word: edits saved in the Word file', /<w:b\/><w:bCs\/><\/w:rPr><w:t[^>]*>report<\/w:t>/.test(x) && /<w:pStyle w:val="Heading2"\/><\/w:pPr><w:r><w:t[^>]*>Between the lists/.test(x) && /<w:numId w:val="1"\/><\/w:numPr><\/w:pPr><w:r><w:t[^>]*>Fourth bullet/.test(x));
+    const count = (re, s) => (s.match(re) || []).length, ids = (n, s) => [...s.matchAll(new RegExp(`<w:${n} [^>]*w:id="(\\d+)"`, 'g'))].map(m => m[1]).sort().join(',');
+    ok('word: fields, bookmarks and sections stay whole', count(/fldCharType="begin"/g, x) === count(/fldCharType="end"/g, x) && ids('bookmarkStart', x) === ids('bookmarkEnd', x) && ids('commentRangeStart', x) === ids('commentRangeEnd', x) && count(/<w:sectPr/g, x) === 2, `${count(/<w:sectPr/g, x)} sections`);
+    DX.undo(); DX.undo(); ok('word: undo', P().some(p => DX.ptext(p).replace(/￼/g, '').startsWith('A sentence with a comment')), P().length);
+    // spelling and grammar right in the page
+    DX.D.dirty = false; await DX.newDocument(); document.querySelector('#dxDoc').focus(); document.execCommand('insertText', false, 'This is an importent sentense.'); await wait(50); await DX.lintAll(); await wait(100);
+    const iss = (P()[0]._issues || []).map(s => s.word); ok('word: spelling marked in the page', iss.includes('importent') && (!window.Highlight || CSS.highlights.has('dx-spell')), iss.join(','));
+    // Fix Formatting and Auto Format
+    DX.D.dirty = false; await DX.openFile(await sample('messy.docx'));
+    const keys = DX.checks().map(c => c.key); ok('word: Fix Formatting finds the problems', ['headings', 'lists', 'fonts', 'sizes', 'spaces', 'empty', 'indent', 'breaks', 'quotes', 'align'].every(k => keys.includes(k)), keys.join(','));
+    DX.applyFixes(DX.checks()); await wait(100); x = await docXml(await DX.buildDocx());
+    ok('word: Fix all leaves a tidy document', !DX.checks().length && /<w:pStyle w:val="Title"\/>/.test(x) && /<w:pStyle w:val="Heading1"\/>/.test(x) && count(/<w:numPr>/g, x) >= 5 && !/ {2,}/.test(x.replace(/<[^>]+>/g, '')), DX.checks().map(c => c.key).join(','));
+    DX.D.dirty = false; await DX.openFile(await sample('messy.docx'));
+    let st = 'pending'; DX.autoFormat().then(() => { st = 'done'; }); await wait(150); const dlgEl = document.querySelector('#dlg');
+    dlgEl.querySelector('[name=set]').value = 'office'; dlgEl.querySelector('[name=colors]').checked = true; dlgEl.querySelector('button[value=ok]').click(); await wait(80);
+    if (st === 'pending') dlgEl.dispatchEvent(new Event('close')); // (a hidden test window does not deliver the dialog's close event)
+    for (let k = 0; k < 60 && st === 'pending'; k++) await wait(250);
+    const hs = [...document.querySelectorAll('#dxDoc p[data-h]')].map(p => p.dataset.h + ':' + p.textContent).join('|');
+    ok('word: Auto Format styles and tidies the document', st === 'done' && /0:ANNUAL SUMMARY/.test(hs) && /1:Background/.test(hs) && /1:Key Points/.test(hs) && !DX.checks().length, hs);
+    DX.close(true);
+  }
+  // ── desktop app: the Windows bridge answers (only inside the .exe) ──
+  if (window.xd3desk) {
+    const info = await xd3desk.info(), st = await xd3desk.pdfDefault(); ok('desktop: Windows bridge', info && info.os && st && typeof st.mine === 'boolean', JSON.stringify({ os: info && info.os.name, pdf: st && st.app }));
+    X.ACT.defapp(); for (let k = 0; k < 20 && !document.querySelector('#dlg[open] #daStat'); k++) await sleep(100);
+    const da = document.querySelector('#dlg[open] #daStat'); ok('desktop: Default PDF app dialog', da && /XD3 PDF Editor opens|PDFs now open with/.test(da.textContent), da && da.textContent);
+    const dlgEl = document.querySelector('#dlg'); if (dlgEl.open) { dlgEl.close(); dlgEl.dispatchEvent(new Event('close')); }
+    if (X.docx) { // the Word editor's "PDF" button: the page printed by the app itself
+      X.docx.D.dirty = false; await X.docx.openFile(new File([await (await fetch('tests/samples/complex.docx')).blob()], 'complex.docx'));
+      document.documentElement.classList.add('dxprint'); await sleep(200);
+      let pdf = null, t = ''; try { pdf = await reopen(new Uint8Array(await xd3desk.printToPdf({ width: 8.5, height: 11, margins: { top: 1, bottom: 1, left: 1, right: 1 } }))); for (let k = 1; k <= pdf.numPages; k++) t += await textOf(pdf, k) + ' '; } finally { document.documentElement.classList.remove('dxprint'); }
+      ok('desktop: Word document saved as an exact PDF', pdf && pdf.numPages >= 2 && /Project Report/.test(t) && /landscape sec/.test(t) && !/Auto Format|Spelling/.test(t), pdf && pdf.numPages + ' pages: ' + t.replace(/\s+/g, ' ').slice(-160)); // (the Calibri 'ti' ligature reads back as one odd character)
+      X.docx.close(true);
+    }
+  }
+
   // ── session round trip ──
   await X.openFiles; S.dirty = true; X.scheduleSave(); await sleep(7000); await X.ACT.restore(); await sleep(300);
   ok('session: restored with edits', S.pages.length === 2 && S.pages[0].objs.some(o => /sleepy dog/.test(o.text || '')), S.pages[0] && S.pages[0].objs.length);

@@ -163,10 +163,11 @@ function showPop(mark) {
     W.ignored.add(keyOf(is)); for (const q of W.paras) q.issues = (q.issues || []).filter(o => keyOf(o) !== keyOf(is)); W.paras.forEach((q, k) => renderPara(k)); renderSide();
   };
 }
-async function addWord(word) {
+async function dictAdd(word) { // your own words: kept in this browser and taught to the checker
   const w = word.trim(); if (!w) return; W.dict = [...new Set([...W.dict, w])]; store.set('xd3.dict', JSON.stringify(W.dict));
-  try { await (await engine()).importWords([w]); } catch (e) { /* */ } await lintAll(); toast(`“${w}” added to your dictionary`);
+  try { await (await engine()).importWords([w]); } catch (e) { /* */ } toast(`“${w}” added to your dictionary`);
 }
+async function addWord(word) { await dictAdd(word); await lintAll(); }
 page.addEventListener('click', e => { const m = e.target.closest('mark.wm'); if (m) showPop(m); else pop.hidden = true; });
 document.addEventListener('pointerdown', e => { if (!pop.hidden && !e.target.closest('#wrPop, mark.wm')) pop.hidden = true; }, true);
 
@@ -221,9 +222,9 @@ const CONTRACT = [['do not', "don't"], ['does not', "doesn't"], ['did not', "did
 const CASUAL = { purchase: 'buy', inquire: 'ask', require: 'need', requires: 'needs', reside: 'live', receive: 'get', received: 'got', commence: 'start', 'a lot of': 'lots of', therefore: 'so', however: 'but' };
 const FORMAL = { "a lot of": 'many', 'lots of': 'many', 'kind of': 'somewhat', 'sort of': 'somewhat', okay: 'acceptable', ok: 'acceptable', kids: 'children', stuff: 'material', gonna: 'going to', wanna: 'want to', gotta: 'have to', 'get rid of': 'remove', 'find out': 'determine', 'figure out': 'determine', 'look into': 'investigate', 'set up': 'establish', big: 'large', really: 'truly' };
 const caseLike = (src, rep) => !rep ? rep : src[0] === src[0].toUpperCase() && src[0] !== src[0].toLowerCase() ? rep[0].toUpperCase() + rep.slice(1) : rep;
-function rewrites(tone) { // → [{ i, a, b, from, to, why }] for the whole document, without overlaps
+function rewrites(tone, paras = W.paras) { // → [{ i, a, b, from, to, why }] for the whole document, without overlaps
   const out = [];
-  W.paras.forEach((p, i) => {
+  paras.forEach((p, i) => {
     const t = p.text, taken = [], add = (a, b, to, why) => { if (taken.some(([x, y]) => a < y && x < b)) return; taken.push([a, b]); out.push({ i, a, b, from: t.slice(a, b), to: caseLike(t.slice(a, b), to), why }); };
     if (tone !== 'formal') {
       for (const [src, rep, why] of WORDY) for (const m of t.matchAll(RE(src))) add(m.index, m.index + m[0].length, rep, why === 'wordy' ? 'shorter, plainer' : why === 'overused' ? 'a stock phrase that sounds machine-written' : why === 'formal' ? 'less stiff' : 'adds nothing');
@@ -265,15 +266,16 @@ const tidy = t => t.replace(/ {2,}/g, ' ').replace(/ ([,.;:!?])/g, '$1').replace
 /* ───────── statistics ───────── */
 const syllables = w => { w = w.toLowerCase().replace(/[^a-z]/g, ''); if (!w) return 0; if (w.length <= 3) return 1; w = w.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, '').replace(/^y/, ''); const m = w.match(/[aeiouy]{1,2}/g); return Math.max(1, m ? m.length : 1); };
 const STOP = new Set('the a an and or but if of to in on at by for with from as is are was were be been being it its this that these those i you he she we they me him her us them my your his our their not no so do does did have has had will would can could should may might must there here what which who whom whose when where why how all any each few more most other some such than too very just also into over under about after before again then once only own same both up down out off'.split(' '));
-function renderStats() {
-  const text = W.paras.map(p => p.text).join('\n'), words = text.match(/[\p{L}\p{N}'’-]+/gu) || [], sents = (text.match(/[^.!?\n]+[.!?]+|[^.!?\n]+$/gm) || []).filter(s => /\p{L}/u.test(s));
+function renderStats() { pane.innerHTML = statsHtml(W.paras); }
+function statsHtml(paras) {
+  const text = paras.map(p => p.text).join('\n'), words = text.match(/[\p{L}\p{N}'’-]+/gu) || [], sents = (text.match(/[^.!?\n]+[.!?]+|[^.!?\n]+$/gm) || []).filter(s => /\p{L}/u.test(s));
   const nW = words.length, nS = Math.max(1, sents.length), syl = words.reduce((a, w) => a + syllables(w), 0), fre = 206.835 - 1.015 * (nW / nS) - 84.6 * (syl / Math.max(1, nW)), fk = 0.39 * (nW / nS) + 11.8 * (syl / Math.max(1, nW)) - 15.59;
   const level = fre >= 80 ? 'Very easy' : fre >= 70 ? 'Easy' : fre >= 60 ? 'Plain English' : fre >= 50 ? 'Fairly difficult' : fre >= 30 ? 'Difficult' : 'Very difficult';
   const freq = {}; for (const w of words) { const k = w.toLowerCase(); if (k.length > 2 && !STOP.has(k)) freq[k] = (freq[k] || 0) + 1; }
   const top = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 10), long = sents.filter(s => s.split(/\s+/).filter(Boolean).length > 25).length, passive = (text.match(PASSIVE) || []).length;
   const mins = n => n < 1 ? '< 1 min' : Math.round(n) + ' min';
-  pane.innerHTML = `<div class="wstats">
-    ${[['Words', nW], ['Characters', text.replace(/\n/g, '').length], ['Without spaces', text.replace(/\s/g, '').length], ['Sentences', sents.length], ['Paragraphs', W.paras.filter(p => p.text.trim()).length], ['Reading time', mins(nW / 238)], ['Speaking time', mins(nW / 150)], ['Words per sentence', (nW / nS).toFixed(1)]].map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('')}
+  return `<div class="wstats">
+    ${[['Words', nW], ['Characters', text.replace(/\n/g, '').length], ['Without spaces', text.replace(/\s/g, '').length], ['Sentences', sents.length], ['Paragraphs', paras.filter(p => p.text.trim()).length], ['Reading time', mins(nW / 238)], ['Speaking time', mins(nW / 150)], ['Words per sentence', (nW / nS).toFixed(1)]].map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('')}
     </div>
     <div class="wread"><div class="wbar"><span style="width:${clamp(fre, 0, 100)}%"></span></div><b>${level}</b> · reading ease ${Math.round(fre)} / 100 · school grade ${Math.max(1, Math.round(fk))}</div>
     <p class="mut">${long} long sentence(s) (over 25 words) · ${passive} passive construction(s) · ${new Set(words.map(w => w.toLowerCase())).size} different words</p>
@@ -413,7 +415,7 @@ function close() { W.open = false; box.hidden = true; pop.hidden = true; documen
 
 /* ───────── header actions ───────── */
 const ACTS = {
-  open: async () => openFile(await pick('.docx,.txt,.md,.csv,text/plain')),
+  open: async () => { const f = await pick('.docx,.txt,.md,.csv,text/plain'); if (f && /\.docx$/i.test(f.name) && X.docx) { close(); return X.docx.openFile(f); } return openFile(f); }, // (Word files open in the Word editor, which has these tools too)
   paste: async () => { let t = ''; try { t = await navigator.clipboard.readText(); } catch (e) { /* no clipboard access */ } await openWith((t || '').replace(/\r\n?/g, '\n').split('\n').map(text => ({ text, orig: text, issues: [] })), 'text', 'text'); if (!t) { const el = page.querySelector('.wp'); if (el) el.focus(); toast('Type or paste your text', 'info'); } },
   pdf: async () => { if (!S.pages.length) return toast('Open a PDF first'); await busy(async () => openWith(await loadPdf(), 'pdf', X.baseName()), 'Reading the PDF…'); },
   undo: undoW, redo: redoW, close,
@@ -438,5 +440,5 @@ Object.assign(X.ACT, {
 });
 X.NO_DOC.add('writer'); ['w_docx', 'w_txt', 'w_copy', 'w_pdf'].forEach(a => X.NO_DOC.add(a));
 X.openInWriter = async file => { show(); await openFile(file); };
-X.writing = { W, engine, lintAll, loadDocx, buildDocx, changes, splice, openWith, rewrites, styleIssues, applyToPdf, show, close, openFile };
+X.writing = { W, engine, lintAll, loadDocx, buildDocx, changes, splice, openWith, rewrites, styleIssues, statsHtml, dictAdd, applyToPdf, show, close, openFile };
 })();
