@@ -1,5 +1,5 @@
 /* XD3 PDF Editor — service worker: after the first visit the editor keeps working with no connection, and it can be installed like an app. */
-const VERSION = 'xd3-pdf-editor-v8'; // (raise on every release: it replaces the cached libraries and fonts)
+const VERSION = 'xd3-pdf-editor-v9'; // (raise on every release: it replaces the cached libraries and fonts)
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'css/style.css', 'js/app.js', 'js/native.js', 'js/ocr.js', 'js/insert.js', 'js/imaging.js', 'js/convert.js', 'js/forms.js', 'js/extras.js', 'js/reader.js', 'js/writing.js', 'js/download.js', 'js/desktop.js', 'js/docx.js', 'js/organize.js', 'js/secure.js', 'js/ui.js', 'js/bundle.js',
   'lib/pdf.min.js', 'lib/pdf.worker.min.js', 'lib/pdf-lib.min.js', 'lib/fontkit.umd.min.js', 'lib/jszip.min.js', 'icons/icon-192.png', 'icons/icon-512.png'];
 

@@ -892,7 +892,7 @@ async function origFont(p, it, light) { // the typeface an original line is set 
   let f = null; try { const pg = await getPdfPage(p); if (!pg.commonObjs.has(it.fontName)) await scanPage(p); f = await pdfFont(pg, it.fontName); } catch (e) { /* described by its fallback below */ }
   const name = (f && f.name) || '', fam = fontFamilyFor(name) || (LOOKALIKE.find(([re]) => re.test(name)) || [])[1] || null, bold = !!f && (!!f.black || /bold|black|heavy|semibold|demi/i.test(name)), italic = /ital|obli/i.test(name) || !!(f && f.italic);
   const fb = fam || (/courier|mono|consol|typewriter/i.test(name) ? 'Courier' : /times|georgia|cambria|garamond|palatino|minion|bookman|century|serif|nimbusrom|cmr\d|cmbx|cmti/i.test(name) && !/sans/i.test(name) ? 'Times' : /arial|helvet|verdana|tahoma|calibri|segoe|sans/i.test(name) ? 'Helvetica' : it.font || 'Helvetica');
-  const out = { font: fb, bold, italic, real: name ? cleanFontName(name) : '', family: fam, type3: !!(f && f.isType3Font) };
+  const out = { font: fb, bold, italic, real: name ? cleanFontName(name) : '', ps: name, family: fam, type3: !!(f && f.isType3Font) };
   if (!light && f && f.data && f.data.length > 200 && !f.isType3Font) { // embedded in the PDF → keep using that very font
     const bytes = new Uint8Array(f.data), id = xfId(name, bytes);
     if (!S.xfonts[id]) S.xfonts[id] = { name: out.real, ps: name, bytes, bold, italic, fb };
@@ -1456,11 +1456,12 @@ function paintObj(ctx, o, imgs) { // canvas twin of objEl — image exports use 
   }
   ctx.restore();
 }
-async function renderPageImage(p, k) { // the page with all edits, as a canvas at k pixels per point
+async function renderPageImage(p, k, opt = {}) { // the page with all edits, as a canvas at k pixels per point; opt.noText: everything but the text, opt.annots === false: without annotations / form fields
   const [rw, rh] = rdims(p), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(rw * k)); c.height = Math.max(1, Math.round(rh * k));
   const ctx = c.getContext('2d', { willReadFrequently: true }); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  if (opt.noText) ctx.fillText = ctx.strokeText = () => {}; // (pdf.js and our own text objects both draw glyphs through these two)
   // intent 'print' keeps pdf.js from waiting on animation frames, so exports also finish in a background tab
-  if (p.src >= 0) { const pg = await getPdfPage(p); await pg.render({ canvasContext: ctx, intent: 'print', viewport: pg.getViewport({ scale: k, rotation: (pg.rotate + p.rot) % 360 }) }).promise; }
+  if (p.src >= 0) { const pg = await getPdfPage(p); await pg.render({ canvasContext: ctx, intent: 'print', annotationMode: opt.annots === false ? pdfjsLib.AnnotationMode.DISABLE : undefined, viewport: pg.getViewport({ scale: k, rotation: (pg.rotate + p.rot) % 360 }) }).promise; }
   if (p.objs.length) {
     const imgs = {};
     await Promise.all([...new Set(p.objs.filter(o => o.type === 'text').map(o => o.font))].map(ensureFont));

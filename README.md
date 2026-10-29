@@ -19,7 +19,7 @@ web app, or as a Windows program — and nothing is ever uploaded.
   picture only when a blackout covers a picture. *Find ▸ Black out all* redacts every match. Deleted pages leave nothing behind in the file.
 - **Make searchable** — OCR a scanned document and keep the words as an invisible layer that any reader can search and copy.
 - **Pages** — merge PDF / Word / images, reorder, rotate, replace, extract, resize, page numbers, headers and footers, bookmarks.
-- **Convert** — PDF ⇄ Word, PDF → images, images → PDF, text export; compress; split; compare two versions; batch processing.
+- **Convert** — PDF ⇄ Word (PDF → Word keeps the exact look: page design behind, editable text in the same fonts at the same places), PDF → images, images → PDF, text export; compress (pictures resampled to the resolution they are shown at, duplicates merged, transparency kept); split; compare two versions; batch processing.
 - **Protect** — AES password protection, permanent redaction (flatten).
 - **Insert** — images, signatures (drawn or typed), stamps, dates, watermarks; scan with the camera.
 - **Links and crop** — add links to web pages or other pages; crop pages (one, all, or all of the same size).

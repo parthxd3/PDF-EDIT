@@ -50,31 +50,39 @@ function runXml(l, text) {
   const rpr = `<w:rPr><w:rFonts w:ascii="${f}" w:hAnsi="${f}" w:cs="${f}"/>${l.bold ? '<w:b/>' : ''}${l.italic ? '<w:i/>' : ''}${l.strike ? '<w:strike/>' : ''}${col}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>${l.underline ? '<w:u w:val="single"/>' : ''}</w:rPr>`;
   return `<w:r>${rpr}<w:t xml:space="preserve">${xesc(text)}</w:t></w:r>`;
 }
+const fnv = u8 => { let h = 0x811c9dc5; for (let i = 0; i < u8.length; i++) { h ^= u8[i]; h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(36) + '.' + u8.length; };
 function docxBuilder() {
-  const zip = new JSZip(), rels = [], seen = new Map(); let n = 0, dp = 0;
-  const media = url => { // → relationship id for an image data-URL (each distinct image stored once)
-    if (seen.has(url)) return seen.get(url);
-    const ext = /^data:image\/jpe?g/.test(url) ? 'jpeg' : 'png', id = 'rId' + (++n), name = `image${n}.${ext}`;
-    zip.file('word/media/' + name, url.split(',')[1], { base64: true }); rels.push(`<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${name}"/>`);
-    seen.set(url, id); return id;
+  const zip = new JSZip(), rels = [], seen = new Map(), put = (name, data, o) => zip.file(name, data, { createFolders: false, ...o }); let n = 0, dp = 0; // (no folder entries in the package)
+  const media = src => { // a data URL, or { bytes, ext, key } → relationship id (each distinct picture is stored once)
+    const url = typeof src === 'string', key = url ? src : src.key; if (key && seen.has(key)) return seen.get(key);
+    const ext = url ? (/^data:image\/jpe?g/.test(src) ? 'jpeg' : 'png') : src.ext, id = 'rId' + (100 + ++n), name = `image${n}.${ext}`;
+    put('word/media/' + name, url ? src.split(',')[1] : src.bytes, url ? { base64: true } : {}); rels.push(`<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${name}"/>`);
+    if (key) seen.set(key, id); return id;
   };
-  const pic = (url, w, h, at) => { // inline picture, or floating at a page position when `at` is given
-    const rid = media(url), id = ++dp, ext = `cx="${emu(w)}" cy="${emu(h)}"`;
-    const g = `<wp:docPr id="${id}" name="Picture ${id}"/><wp:cNvGraphicFramePr/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="Picture ${id}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext ${ext}/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic>`;
+  const pic = (src, w, h, at) => { // inline picture, or floating behind the text at a page position when `at` is given
+    const rid = media(src), id = ++dp, ext = `cx="${emu(w)}" cy="${emu(h)}"`;
+    const g = `<wp:docPr id="${id}" name="${at ? 'Page design' : 'Picture'} ${id}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="${id}" name="Picture ${id}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="${rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext ${ext}/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic>`;
     if (!at) return `<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent ${ext}/><wp:effectExtent l="0" t="0" r="0" b="0"/>${g}</wp:inline></w:drawing></w:r>`;
     return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${id}" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>${emu(at.x)}</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>${emu(at.y)}</wp:posOffset></wp:positionV><wp:extent ${ext}/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/>${g}</wp:anchor></w:drawing></w:r>`;
   };
+  const tbox = (x, y, w, h, rot, inner) => { // an invisible text box pinned to the page (x, y: its top-left before turning; it turns around its centre)
+    const id = ++dp, ext = `cx="${emu(w)}" cy="${emu(h)}"`, r = Math.round((((rot % 360) + 360) % 360) * 60000);
+    return `<w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="${5000 + id}" behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>${emu(x)}</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>${emu(y)}</wp:posOffset></wp:positionV><wp:extent ${ext}/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="${id}" name="Text ${id}"/><wp:cNvGraphicFramePr/><a:graphic><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"><wps:wsp><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm${r ? ` rot="${r}"` : ''}><a:off x="0" y="0"/><a:ext ${ext}/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></wps:spPr><wps:txbx><w:txbxContent>${inner}</w:txbxContent></wps:txbx><wps:bodyPr rot="0" vert="horz" wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" anchor="t" anchorCtr="0"><a:spAutoFit/></wps:bodyPr></wps:wsp></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r>`;
+  };
   const sect = (w, h, m) => `<w:sectPr><w:pgSz w:w="${twip(w)}" w:h="${twip(h)}"${w > h ? ' w:orient="landscape"' : ''}/><w:pgMar w:top="${twip(m.t)}" w:right="${twip(m.r)}" w:bottom="${twip(m.b)}" w:left="${twip(m.l)}" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr>`;
-  const finish = async body => {
-    const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
-    const H = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
-    zip.file('[Content_Types].xml', `${H}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`);
-    zip.file('_rels/.rels', `${H}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
-    zip.file('word/_rels/document.xml.rels', `${H}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${rels.join('')}</Relationships>`);
-    zip.file('word/document.xml', `${H}<w:document ${NS}><w:body>${body}</w:body></w:document>`);
+  const finish = async (body, title) => {
+    const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture" xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"';
+    const H = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>', W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"', CT = 'application/vnd.openxmlformats-officedocument', now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+    put('[Content_Types].xml', `${H}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="${CT}.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="${CT}.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="${CT}.wordprocessingml.settings+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>`);
+    put('_rels/.rels', `${H}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>`);
+    put('docProps/core.xml', `${H}<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xesc(title || '')}</dc:title><dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified></cp:coreProperties>`);
+    put('word/_rels/document.xml.rels', `${H}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>${rels.join('')}</Relationships>`);
+    put('word/styles.xml', `${H}<w:styles ${W}><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="Calibri" w:cs="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style></w:styles>`);
+    put('word/settings.xml', `${H}<w:settings ${W}><w:zoom w:percent="100"/><w:defaultTabStop w:val="720"/><w:characterSpacingControl w:val="doNotCompress"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>`);
+    put('word/document.xml', `${H}<w:document ${NS}><w:body>${body}</w:body></w:document>`);
     return zip.generateAsync({ type: 'blob', compression: 'DEFLATE', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
   };
-  return { pic, sect, finish };
+  return { pic, tbox, sect, finish };
 }
 // each builder returns { paras: [{ ppr, body }], margins } for one page; the section break is attached to the page's last paragraph
 function flowPage(pc, p, B) { // flowing, editable text — paragraphs are re-joined so Word can re-wrap them
@@ -107,37 +115,218 @@ function flowPage(pc, p, B) { // flowing, editable text — paragraphs are re-jo
     }),
   };
 }
-function framePage(pc, p, B) { // every line pinned at its exact position (text frames) — looks identical, edits line by line
-  const paras = pc.lines.map(l => ({
-    ppr: `<w:framePr w:w="${twip(l.w * 1.1 + 8)}" w:h="${twip(l.size * 1.25)}" w:hRule="exact" w:wrap="none" w:vAnchor="page" w:hAnchor="page" w:x="${twip(Math.max(0, l.x))}" w:y="${twip(Math.max(0, l.base - 0.95 * l.size))}"/><w:spacing w:before="0" w:after="0" w:line="${twip(l.size * 1.2)}" w:lineRule="exact"/>`,
-    body: runXml(l, l.str),
-  }));
-  paras.push({ ppr: '<w:spacing w:before="0" w:after="0"/>', body: pc.images.map(im => B.pic(im.url, im.w, im.h, im)).join('') });
-  return { paras, margins: { t: 10, l: 10, r: 10, b: 10 } };
+
+/* "Same as the PDF": the page's own drawing (rules, table lines, shading, pictures, form fields) becomes one picture behind the text,
+   and every piece of text goes into an invisible text box at its exact place — in the font Word has that matches, at the exact width.
+   Text the PDF itself does not show (the hidden layer of a scanned page, text drawn as shapes) is kept as see-through, searchable text. */
+const DK = 2.5; // the page design is rendered at 180 dpi
+const probe = document.createElement('canvas').getContext('2d'); try { probe.fontKerning = 'none'; probe.textRendering = 'optimizeSpeed'; } catch (e) { /* older Chromium: kerning stays on */ }
+const hasFont = (() => { // is this font installed? (it measures differently from every generic family)
+  const memo = {}, t = 'mmmmmmmmmmlliWWQ@#0123456789ag';
+  return name => {
+    if (name in memo) return memo[name]; let ok = false; const q = name.replace(/["\\]/g, '');
+    for (const g of ['monospace', 'serif', 'sans-serif']) { probe.font = `40px ${g}`; const a = probe.measureText(t).width; probe.font = `40px "${q}", ${g}`; if (Math.abs(probe.measureText(t).width - a) > 0.2) { ok = true; break; } }
+    return memo[name] = ok;
+  };
+})();
+const STD_FONT = { helvetica: 'Arial', arial: 'Arial', arimo: 'Arial', liberationsans: 'Arial', nimbussans: 'Arial', nimbussansl: 'Arial', times: 'Times New Roman', timesroman: 'Times New Roman', timesnewroman: 'Times New Roman', tinos: 'Times New Roman', liberationserif: 'Times New Roman', nimbusroman: 'Times New Roman', courier: 'Courier New', couriernew: 'Courier New', cousine: 'Courier New', liberationmono: 'Courier New', nimbusmono: 'Courier New', carlito: 'Calibri', caladea: 'Cambria', gelasio: 'Georgia', dejavusans: 'Verdana', symbol: 'Symbol', zapfdingbats: 'Wingdings' };
+const WEIGHT_RE = /(Semi[Bb]old|Demi[Bb]old|Extra[Bb]old|Ultra[Bb]old|Semi[Ll]ight|Extra[Ll]ight|Ultra[Ll]ight|Light|Thin|Medium|Black|Heavy|Condensed|Narrow)/;
+const fontMemo = new Map();
+function wordFont(ps, cls) { // a PDF font name → { name: the font Word should use, exact: Word has that very font, weight: the family name already carries the weight }
+  const key = ps + '|' + cls; if (fontMemo.has(key)) return fontMemo.get(key);
+  const done = v => (fontMemo.set(key, v), v), sp = s => s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').trim();
+  const raw = String(ps || '').replace(/^[A-Z]{6}\+/, ''), parts = raw.split(/[-,]/), base = (parts[0] || '').replace(/(PS)?MT$|PS$/, ''), wt = ((parts[1] || '').match(WEIGHT_RE) || [])[1] || '';
+  const bare = base.replace(/(Bold|Italic|Oblique|Regular|Book|Normal)+$/, '') || base, cand = [];
+  if (wt) cand.push([sp(bare) + ' ' + wt.replace(/^(Semi|Demi|Extra|Ultra)([BL])/, (m, a, b) => a + b.toLowerCase()), 1], [sp(bare) + ' ' + wt, 1]);
+  cand.push([sp(bare), 0], [sp(base), WEIGHT_RE.test(base) ? 1 : 0], [bare, 0]);
+  for (const [n, w] of cand) { if (!n) continue; const std = STD_FONT[n.toLowerCase().replace(/[^a-z]/g, '')], nm = std || n; if (hasFont(nm)) return done({ name: nm, exact: true, weight: !!w && !std }); }
+  const alt = STD_FONT[String(cls || '').toLowerCase().replace(/[^a-z]/g, '')];
+  if (alt && hasFont(alt)) return done({ name: alt, exact: false, weight: false });
+  return done({ name: /courier|mono/i.test(cls) ? 'Courier New' : /times|serif/i.test(cls) && !/sans/i.test(cls) ? 'Times New Roman' : 'Arial', exact: false, weight: false });
+}
+const natWidth = (text, st) => { probe.font = `${st.italic ? 'italic ' : ''}${st.bold ? 'bold ' : ''}100px "${st.font.replace(/["\\]/g, '')}"`; return probe.measureText(text).width * st.sz / 200; }; // st.sz: half-points, as Word stores sizes
+const GHOST = '<w14:textFill><w14:solidFill><w14:srgbClr w14:val="000000"><w14:alpha w14:val="100000"/></w14:srgbClr></w14:solidFill></w14:textFill>';
+function rprXml(st, w100, sp) {
+  const f = xesc(st.font), col = st.color && /^#[0-9a-f]{6}$/i.test(st.color) && st.color.toLowerCase() !== '#000000' && !st.ghost ? `<w:color w:val="${st.color.slice(1).toUpperCase()}"/>` : '';
+  return `<w:rPr><w:rFonts w:ascii="${f}" w:hAnsi="${f}" w:eastAsia="${f}" w:cs="${f}"/>${st.bold ? '<w:b/><w:bCs/>' : ''}${st.italic ? '<w:i/><w:iCs/>' : ''}${st.strike ? '<w:strike/>' : ''}${st.ghost ? '<w:noProof/>' : ''}${col}${sp ? `<w:spacing w:val="${sp}"/>` : ''}${w100 && w100 !== 100 ? `<w:w w:val="${w100}"/>` : ''}${st.pos ? `<w:position w:val="${st.pos}"/>` : ''}<w:sz w:val="${st.sz}"/><w:szCs w:val="${st.sz}"/>${st.underline ? '<w:u w:val="single"/>' : ''}${st.ghost ? GHOST : ''}</w:rPr>`;
+}
+const runOf = (text, st, w100, sp) => `<w:r>${rprXml(st, w100, sp)}<w:t xml:space="preserve">${xesc(text)}</w:t></w:r>`;
+function fitRuns(text, target, st) { // text set so that it takes up exactly `target` points: extra room of a justified line goes into its word gaps, small differences are spread over the letters
+  const chars = [...text].length; if (!chars) return { xml: '', w: 0 };
+  const nat = natWidth(text, st); let w100 = 100;
+  if (!st.exact && nat > 0.5) w100 = clamp(Math.round(target / nat * 100), 40, 250); // a stand-in font: scaled to the original's width
+  const nw = nat * w100 / 100, extra = target - nw, nSp = (text.match(/ /g) || []).length, size = st.sz / 2;
+  if (nSp && extra > 0.3 + 0.006 * nw && extra / nSp < 3 * size) {
+    const s = Math.round(extra / nSp * 20); let xml = '';
+    for (const part of text.split(/( +)/)) if (part) xml += runOf(part, st, w100, part[0] === ' ' ? s : 0);
+    return { xml, w: nw + nSp * s / 20 };
+  }
+  const s = clamp(Math.round(extra / chars * 20), Math.round(-6 * size), Math.round(20 * size)); // twentieths of a point after every character
+  return { xml: runOf(text, st, w100, s), w: nw + chars * s / 20 };
+}
+function linesOf(ps) { // pieces sharing a baseline and standing close together → one line, its pieces left to right
+  const rows = [], out = [];
+  for (const q of [...ps].sort((a, b) => a.base - b.base || a.x - b.x)) {
+    let row = null; for (let i = rows.length - 1; i >= 0 && i >= rows.length - 30; i--) { const r = rows[i]; if (Math.abs(r.base - q.base) < 0.3 * Math.min(r.size, q.size)) { row = r; break; } }
+    if (row) row.ps.push(q); else rows.push({ base: q.base, size: q.size, ps: [q] });
+  }
+  for (const r of rows) {
+    r.ps.sort((a, b) => a.x - b.x); let cur = null, end = 0;
+    for (const q of r.ps) {
+      const gap = q.x - end;
+      if (cur && gap < 1.2 * Math.max(q.size, cur.size) && gap > -0.3 * q.size && !q.ghost === !cur.ghost) { cur.runs.push(q); cur.size = Math.max(cur.size, q.size); end = Math.max(end, q.x + q.w); }
+      else { out.push(cur = { runs: [q], size: q.size, ghost: !!q.ghost }); end = q.x + q.w; }
+    }
+  }
+  for (const l of out) { const big = l.runs.reduce((a, b) => (b.size > a.size ? b : a)); Object.assign(l, { base: big.base, x: l.runs[0].x, right: Math.max(...l.runs.map(q => q.x + q.w)) }); }
+  return out;
+}
+function blocksOf(lines) { // lines below one another at an even spacing → one text box (paragraphs stay editable together)
+  const blocks = [];
+  for (const l of [...lines].sort((a, b) => a.base - b.base || a.x - b.x)) {
+    let hit = null;
+    for (let i = blocks.length - 1; i >= 0 && i >= blocks.length - 16; i--) {
+      const b = blocks[i], last = b.lines[b.lines.length - 1], gap = l.base - last.base, sz = Math.max(l.size, last.size);
+      if (b.ghost !== l.ghost || Math.abs(l.size - b.size) > 0.15 * b.size || gap < 0.95 * sz || gap > 2.2 * sz) continue;
+      if (b.gap && Math.abs(gap - b.gap) > Math.max(0.35, 0.05 * b.gap)) continue;
+      const ov = Math.min(l.right, last.right) - Math.max(l.x, last.x); if (ov < 0.25 * Math.min(l.right - l.x, last.right - last.x)) continue;
+      hit = b; break;
+    }
+    if (hit) { if (!hit.gap) hit.gap = l.base - hit.lines[hit.lines.length - 1].base; hit.lines.push(l); } else blocks.push({ lines: [l], size: l.size, ghost: l.ghost, gap: 0 });
+  }
+  return blocks;
+}
+function alignOf(L) {
+  if (L.length < 2) return 'left';
+  const same = (f, tol) => L.every(l => Math.abs(f(l) - f(L[0])) < tol);
+  return same(l => l.x, 1) ? 'left' : same(l => (l.x + l.right) / 2, 1.5) ? 'center' : same(l => l.right, 1.5) ? 'right' : 'left';
+}
+function styleOf(q, l, sc) {
+  const pos = Math.round((l.base - q.base) * sc * 2);
+  return { font: q.font, exact: q.exact, bold: q.bold, italic: q.italic, underline: q.underline, strike: q.strike, color: q.color, ghost: q.ghost, sz: clamp(Math.round(q.size * sc * 2), 2, 3276), pos: Math.abs(pos) >= 1 ? pos : 0 };
+}
+function lineXml(l, sc) { // every piece starts exactly where it starts in the PDF, the last one ends where it ends
+  let out = '', carry = 0;
+  l.runs.forEach((q, i) => {
+    const nx = l.runs[i + 1], st = styleOf(q, l, sc); let text = q.str.replace(/[\r\n\t]/g, ' '), target = (nx ? nx.x - q.x : q.w) * sc + carry;
+    if (nx && nx.x - (q.x + q.w) > 0.1 * q.size && !/\s$/.test(text) && !/^\s/.test(nx.str)) text += ' ';
+    if (!nx) { const t = text.replace(/\s+$/, ''); if (t !== text) { target -= natWidth(text.slice(t.length), st); text = t; } }
+    const r = fitRuns(text, target, st); out += r.xml; carry = target - r.w;
+  });
+  return out;
+}
+function blockXml(b, B, place, prot, sc) {
+  const lines = b.lines, L = b.gap || 1.2 * b.size, al = alignOf(lines), x0 = Math.min(...lines.map(l => l.x)), r0 = Math.max(...lines.map(l => l.right));
+  const span = r0 - x0, slack = 0.03 * span + 0.6 * b.size + 2; let bx = x0, bw = span + slack;
+  if (al === 'center') { const c = lines.reduce((a, l) => a + (l.x + l.right) / 2, 0) / lines.length, half = Math.max(...lines.map(l => Math.max(c - l.x, l.right - c))) + slack / 2; bx = c - half; bw = 2 * half; }
+  else if (al === 'right') { bx = x0 - slack; bw = r0 - bx; }
+  // Word puts the baseline 0.8 of an exact line height below the line's top. Lines at the paragraph's spacing follow with a line break;
+  // a line whose spacing differs starts a new paragraph whose line height lands its baseline exactly (0.2 of the last height + 0.8 of the new one).
+  const exact = v => Math.max(1, twip(v * sc)) / 20 / sc, top = lines[0].base - 0.8 * exact(L); let xml = '', para = null, bh = 0, wb = 0; // wb: where Word puts the previous baseline
+  const close = () => { if (para) xml += `<w:p><w:pPr>${para.ppr}</w:pPr>${para.body}</w:p>`; };
+  lines.forEach((l, i) => {
+    if (para && Math.abs(l.base - (wb + para.L)) < 0.12 && (al !== 'left' || Math.abs(l.x - lines[i - 1].x) < 0.5)) { para.body += '<w:r><w:br/></w:r>' + lineXml(l, sc); bh += para.L; wb += para.L; return; }
+    const Lp = exact(i ? Math.max(0.9 * l.size, (l.base - wb - 0.2 * para.L) / 0.8) : L); wb = i ? wb + 0.2 * para.L + 0.8 * Lp : top + 0.8 * Lp; close(); bh += Lp;
+    const ind = l.x - bx, st = styleOf(l.runs[0], l, sc);
+    para = { L: Lp, ppr: `<w:spacing w:before="0" w:after="0" w:line="${twip(Lp * sc)}" w:lineRule="exact"/>${al === 'left' && ind > 0.05 ? `<w:ind w:left="${twip(ind * sc)}"/>` : ''}${al !== 'left' ? `<w:jc w:val="${al}"/>` : ''}${rprXml({ ...st, pos: 0 }, 100, 0)}`, body: lineXml(l, sc) };
+  });
+  close();
+  const q = lines[0].runs[0], [cx, cy] = place(q, bx + bw / 2, top + bh / 2);
+  return B.tbox((cx - bw / 2) * sc, (cy - bh / 2) * sc, bw * sc, bh * sc, (q.rot || 0) + prot, xml);
+}
+async function samePage(p, B) {
+  const [PW, PH] = X.rdims(p), sc = Math.min(1, 1584 / Math.max(PW, PH)), K = DK, rot = (((p.rot || 0) % 360) + 360) % 360; // (Word pages are at most 22 inches)
+  const bg = await X.renderPageImage(p, K, { noText: true, annots: false }), ref = await X.renderPageImage(p, K, { annots: false });
+  const W = bg.width, H = bg.height, bx = bg.getContext('2d', { willReadFrequently: true }), bd = bx.getImageData(0, 0, W, H), d = bd.data, rd = ref.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data;
+  if (p.src >= 0) { // form fields, stamps and other annotations keep their look: they go into the page design
+    let an = []; try { an = await (await X.getPdfPage(p)).getAnnotations({ intent: 'print' }); } catch (e) { /* none readable */ }
+    if (an.length) {
+      const fd = (await X.renderPageImage(p, K)).getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data; let ch = 0;
+      for (let i = 0; i < d.length; i += 4) if (fd[i] !== rd[i] || fd[i + 1] !== rd[i + 1] || fd[i + 2] !== rd[i + 2]) { d[i] = fd[i]; d[i + 1] = fd[i + 1]; d[i + 2] = fd[i + 2]; ch++; }
+      if (ch) bx.putImageData(bd, 0, 0);
+    }
+  }
+  // the page design, cropped to where something is drawn (a page of plain text needs no picture at all)
+  let x0 = W, y0 = H, x1 = -1, y1 = -1, back = '';
+  for (let y = 0; y < H; y++) for (let x = 0, i = y * W * 4; x < W; x++, i += 4) if (d[i] < 248 || d[i + 1] < 248 || d[i + 2] < 248) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; y1 = y; }
+  if (x1 >= 0) {
+    const c = document.createElement('canvas'); c.width = x1 - x0 + 1; c.height = y1 - y0 + 1; c.getContext('2d').drawImage(bg, x0, y0, c.width, c.height, 0, 0, c.width, c.height);
+    let blob = await toBlob(c, 'image/png'), ext = 'png';
+    if (blob.size > 200000) { const j = await toBlob(c, 'image/jpeg', 0.9); if (j && j.size < blob.size * 0.6) { blob = j; ext = 'jpeg'; } } // photos: JPEG; line art stays crisp PNG
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    back = B.pic({ bytes, ext, key: ext + fnv(bytes) }, c.width / K * sc, c.height / K * sc, { x: x0 / K * sc, y: y0 / K * sc });
+  }
+  // the text
+  const toPage = (x, y) => (rot === 90 ? [p.h - y, x] : rot === 180 ? [p.w - x, p.h - y] : rot === 270 ? [y, p.w - x] : [x, y]);
+  const place = (q, x, y) => { // a point in a piece's own (upright) frame → the page as Word shows it
+    if (q.rot) { const a = q.rot * Math.PI / 180, dx = x - q.pv[0], dy = y - q.pv[1]; x = q.pv[0] + dx * Math.cos(a) - dy * Math.sin(a); y = q.pv[1] + dx * Math.sin(a) + dy * Math.cos(a); }
+    return toPage(x, y);
+  };
+  const pieces = [], styles = {};
+  if (p.src >= 0) { // the PDF's own text pieces (not the merged editing lines), so every word gap — tabs, justified lines — keeps its exact place
+    const pg = await X.getPdfPage(p), vt = pg.getViewport({ scale: 1 }).transform, tc = await pg.getTextContent(), segs = [];
+    for (const it of tc.items) {
+      if (!it.str || !it.str.trim() || !(it.width > 0) || (tc.styles[it.fontName] || {}).vertical) continue;
+      const m = pdfjsLib.Util.transform(vt, it.transform), size = Math.hypot(m[2], m[3]), ang = Math.atan2(m[1], m[0]); if (size < 1) continue;
+      const rot = Math.abs(ang) > 0.02 ? Math.round(ang * 1800 / Math.PI) / 10 : 0, c = [m[4] + Math.cos(ang) * it.width / 2 + Math.sin(ang) * 0.3 * size, m[5] + Math.sin(ang) * it.width / 2 - Math.cos(ang) * 0.3 * size];
+      if (X.covered(p, { x: c[0] - 0.5, y: c[1] - 0.5, w: 1, h: 1 })) continue; // replaced by an edit (its new text comes with the editor's objects below)
+      segs.push({ str: it.str, x: m[4], base: m[5], w: it.width, size, rot, fontName: it.fontName });
+    }
+    for (const l of X.ocrCached ? X.ocrCached(p) : []) if (l.str && l.str.trim() && !X.covered(p, l)) segs.push({ str: l.str, x: l.x, base: l.base, w: l.w, size: l.size, rot: 0 });
+    for (const s of segs) {
+      const f = s.fontName ? await (styles[s.fontName] || (styles[s.fontName] = X.origFont(p, { fontName: s.fontName }, true).catch(() => ({ font: 'Helvetica' })))) : { font: 'Helvetica' };
+      const wf = wordFont(f.ps || f.real || '', f.font);
+      pieces.push({ str: s.str, x: s.x, base: s.base, w: s.w, size: s.size, rot: s.rot, pv: s.rot ? [s.x, s.base] : null, font: wf.name, exact: wf.exact, bold: !!f.bold && !wf.weight, italic: !!f.italic, sample: true });
+    }
+  }
+  for (const o of p.objs) {
+    if (o.type !== 'text' || !o.text || !o.text.trim()) continue;
+    const xf = S.xfonts[o.font], BF = X.BUNDLED[o.font], cls = xf ? xf.fb : BF ? ({ serif: 'Times', monospace: 'Courier' }[BF[2]] || 'Helvetica') : o.font;
+    const wf = wordFont(xf ? xf.ps || xf.name : o.font, cls), pv = o.rot ? X.center(X.bbox(o)) : null;
+    for (const l of X.textLines(o)) if (l.ln.trim()) pieces.push({ str: l.ln, x: l.x, base: l.y, w: l.w, size: o.size, rot: o.rot || 0, pv, font: wf.name, exact: wf.exact, bold: !!o.bold && !wf.weight, italic: !!o.italic, underline: !!o.underline, strike: !!o.strike, color: o.color, sample: false });
+  }
+  for (const q of pieces) { // colour of the text, from the difference between the page with and without it; text that makes no difference is not shown by the PDF either
+    if (!q.sample) continue;
+    const pts = [[q.x, q.base - 0.8 * q.size], [q.x + q.w, q.base - 0.8 * q.size], [q.x, q.base + 0.2 * q.size], [q.x + q.w, q.base + 0.2 * q.size]].map(v => place(q, v[0], v[1]));
+    const xa = clamp(Math.floor(Math.min(...pts.map(v => v[0])) * K), 0, W - 1), xb = clamp(Math.ceil(Math.max(...pts.map(v => v[0])) * K), 0, W - 1), ya = clamp(Math.floor(Math.min(...pts.map(v => v[1])) * K), 0, H - 1), yb = clamp(Math.ceil(Math.max(...pts.map(v => v[1])) * K), 0, H - 1);
+    let md = 0; const hits = [];
+    for (let y = ya; y <= yb; y++) for (let x = xa, i = (y * W + xa) * 4; x <= xb; x++, i += 4) { const dd = Math.abs(rd[i] - d[i]) + Math.abs(rd[i + 1] - d[i + 1]) + Math.abs(rd[i + 2] - d[i + 2]); if (dd > 40) hits.push(dd, i); if (dd > md) md = dd; }
+    if (md < 60) { q.ghost = true; continue; }
+    let r = 0, g = 0, bl = 0, n = 0; for (let k = 0; k < hits.length; k += 2) if (hits[k] >= 0.8 * md) { const i = hits[k + 1]; r += rd[i]; g += rd[i + 1]; bl += rd[i + 2]; n++; }
+    const c = [r / n, g / n, bl / n].map(Math.round); q.color = Math.max(...c) < 70 ? '#000000' : '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+  }
+  const groups = new Map(); // text set at the same angle around the same point is laid out together
+  for (const q of pieces) { const k = q.rot ? q.rot + '|' + q.pv.map(v => v.toFixed(1)).join(',') : '0'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(q); }
+  let boxes = '';
+  for (const g of groups.values()) for (const b of blocksOf(linesOf(g))) boxes += blockXml(b, B, place, rot, sc);
+  const m = 18 * sc;
+  return { w: PW * sc, h: PH * sc, margins: { t: m, l: m, r: m, b: m }, paras: [{ ppr: '<w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/><w:rPr><w:sz w:val="2"/><w:szCs w:val="2"/></w:rPr>', body: back + boxes }] };
+}
+async function buildDocx(pages, mode = 'same') { // → the .docx as a Blob
+  await X.loadLib('jszip'); const B = docxBuilder(); let body = '';
+  for (let i = 0; i < pages.length; i++) {
+    const p = pages[i]; let out, w = p.w, h = p.h;
+    if (mode === 'pic') { [w, h] = X.rdims(p); const c = await X.renderPageImage(p, 150 / 72); out = { paras: [{ ppr: '<w:spacing w:before="0" w:after="0"/>', body: B.pic(c.toDataURL('image/jpeg', 0.85), w, h, { x: 0, y: 0 }) }], margins: { t: 10, l: 10, r: 10, b: 10 } }; }
+    else if (mode === 'flow') out = flowPage(await pageContent(p), p, B);
+    else { out = await samePage(p, B); w = out.w; h = out.h; }
+    if (!out.paras.length) out.paras.push({ ppr: '', body: '' });
+    const sect = B.sect(w, h, out.margins), last = out.paras.length - 1;
+    out.paras.forEach((P, k) => { body += k === last && i < pages.length - 1 ? `<w:p><w:pPr>${P.ppr}${sect}</w:pPr>${P.body}</w:p>` : `<w:p><w:pPr>${P.ppr}</w:pPr>${P.body}</w:p>`; });
+    if (i === pages.length - 1) body += sect;
+  }
+  return B.finish(body, X.baseName());
 }
 async function pdfToDocx() {
   await X.loadLib('jszip');
   const r = await dialog('PDF → Word (.docx)', `
     <label>Layout<select name="mode">
-      <option value="flow">Editable text — flowing paragraphs (best for editing)</option>
-      <option value="frame">Exact layout — text boxes at their original positions</option>
-      <option value="pic">Picture — each page as an image (looks identical, not editable)</option></select></label>
+      <option value="same">Same as the PDF — exact look, editable text (recommended)</option>
+      <option value="flow">Flowing text — plain paragraphs that re-wrap, layout approximated</option>
+      <option value="pic">Picture — each page as an image (not editable)</option></select></label>
     <label>Pages (blank = all), e.g. 1-3, 5<input type="text" name="range" autocomplete="off"></label>
-    <p class="mut">Includes your edits. Text, fonts, sizes, colours and pictures are converted; drawn shapes, tables borders and complex layouts are approximated. Scanned pages have no text to convert — use “Picture”.</p>`, { ok: 'Convert' });
+    <p class="mut">Includes your edits. “Same as the PDF” keeps every line, table border, colour and picture exactly where it is, and puts the text in editable text boxes in the same fonts. Scanned pages keep their look; run OCR first to make their text selectable.</p>`, { ok: 'Convert' });
   if (!r) return; const pages = pickPages(r.range); if (!pages) return;
-  await busy(async () => {
-    const B = docxBuilder(); let body = '';
-    for (let i = 0; i < pages.length; i++) {
-      const p = pages[i]; let out, w = p.w, h = p.h;
-      if (r.mode === 'pic') { [w, h] = X.rdims(p); const c = await X.renderPageImage(p, 150 / 72); out = { paras: [{ ppr: '<w:spacing w:before="0" w:after="0"/>', body: B.pic(c.toDataURL('image/jpeg', 0.85), w, h, { x: 0, y: 0 }) }], margins: { t: 10, l: 10, r: 10, b: 10 } }; }
-      else { const pc = await pageContent(p); out = r.mode === 'frame' ? framePage(pc, p, B) : flowPage(pc, p, B); }
-      if (!out.paras.length) out.paras.push({ ppr: '', body: '' });
-      const sect = B.sect(w, h, out.margins), last = out.paras.length - 1;
-      out.paras.forEach((P, k) => { body += k === last && i < pages.length - 1 ? `<w:p><w:pPr>${P.ppr}${sect}</w:pPr>${P.body}</w:p>` : `<w:p><w:pPr>${P.ppr}</w:pPr>${P.body}</w:p>`; });
-      if (i === pages.length - 1) body += sect;
-    }
-    download(await B.finish(body), X.baseName() + '.docx'); toast('Word document saved to your downloads');
-  }, 'Converting to Word…');
+  await busy(async () => { download(await buildDocx(pages, r.mode), X.baseName() + '.docx'); toast('Word document saved to your downloads'); }, 'Converting to Word…');
 }
 
 /* ───────── DOCX → pages ───────── */
@@ -406,7 +595,11 @@ async function flatten() {
   }, 'Flattening pages…');
 }
 
-/* ───────── compress: re-encode the pictures inside the PDF — text and vector graphics are left untouched ───────── */
+/* ───────── compress: pictures resampled to the resolution they are shown at, duplicates merged, waste removed — text and drawings untouched ───────── */
+const LEVELS = { light: { dpi: 220, q: 0.85 }, balanced: { dpi: 150, q: 0.72 }, strong: { dpi: 110, q: 0.58 }, max: { dpi: 72, q: 0.45 } };
+const mulM = (a, b) => [a[0] * b[0] + a[1] * b[2], a[0] * b[1] + a[1] * b[3], a[2] * b[0] + a[3] * b[2], a[2] * b[1] + a[3] * b[3], a[4] * b[0] + a[5] * b[2] + b[4], a[4] * b[1] + a[5] * b[3] + b[5]];
+const deflate = async u8 => new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
+const PN = n => PDFLib.PDFName.of(n);
 function unpredict(d, w, comps) { // undo PNG row filters (DecodeParms /Predictor 10–15)
   const row = w * comps, rows = Math.floor(d.length / (row + 1)), out = new Uint8Array(rows * row);
   for (let y = 0; y < rows; y++) {
@@ -420,54 +613,190 @@ function unpredict(d, w, comps) { // undo PNG row filters (DecodeParms /Predicto
   }
   return out;
 }
-async function shrinkImage(doc, ref, obj, opt) { // → true when the picture was replaced by a smaller one
-  const L = PDFLib, N = L.PDFName.of.bind(L.PDFName), dict = obj.dict, num = k => { const v = dict.lookup(N(k)); return v instanceof L.PDFNumber ? v.asNumber() : 0; };
-  if (dict.lookup(N('Subtype')) !== N('Image') || dict.has(N('ImageMask')) || dict.has(N('Decode')) || dict.has(N('Mask'))) return false;
-  const w = num('Width'), h = num('Height'); if (num('BitsPerComponent') !== 8 || w * h < 96 * 96 || obj.contents.length < 12000) return false;
-  let filter = dict.lookup(N('Filter')); if (filter instanceof L.PDFArray) { if (filter.size() !== 1) return false; filter = filter.lookup(0); }
-  const cs = dict.lookup(N('ColorSpace')); let comps = cs === N('DeviceRGB') ? 3 : cs === N('DeviceGray') ? 1 : 0;
-  if (!comps && cs instanceof L.PDFArray && cs.lookup(0) === N('ICCBased')) { const icc = cs.lookup(1), n = icc && icc.dict && icc.dict.lookup(N('N')); comps = n instanceof L.PDFNumber ? n.asNumber() : 0; }
+function imageUse(doc) { // image object → the largest size (points) it is drawn at anywhere: { w, h }
+  const L = PDFLib, use = new Map(), visits = new Map();
+  const bytesOf = s => { try { return s instanceof L.PDFRawStream ? L.decodePDFRawStream(s).decode() : s.getContents(); } catch (e) { return null; } };
+  const walk = (bytes, res, ctm0, depth) => {
+    const xo = res instanceof L.PDFDict ? res.lookup(PN('XObject')) : null; if (!(xo instanceof L.PDFDict) || !bytes) return;
+    let ops; try { ops = X.native.parseOps(bytes); } catch (e) { return; }
+    let ctm = ctm0; const st = [];
+    for (const o of ops) {
+      if (o.op === 'q') st.push(ctm); else if (o.op === 'Q') ctm = st.length ? st.pop() : ctm0;
+      else if (o.op === 'cm' && o.args.length === 6 && o.args.every(a => typeof a === 'number')) ctm = mulM(o.args, ctm);
+      else if (o.op === 'Do' && o.args[0] && o.args[0].n) {
+        const ref = xo.get(PN(o.args[0].n)); if (!(ref instanceof L.PDFRef)) continue;
+        const s = doc.context.lookup(ref); if (!(s instanceof L.PDFStream)) continue; const sub = s.dict.lookup(PN('Subtype'));
+        if (sub === PN('Image')) { const u = use.get(ref.tag) || { w: 0, h: 0 }; u.w = Math.max(u.w, Math.hypot(ctm[0], ctm[1])); u.h = Math.max(u.h, Math.hypot(ctm[2], ctm[3])); use.set(ref.tag, u); }
+        else if (sub === PN('Form') && depth < 8) {
+          const v = (visits.get(ref.tag) || 0) + 1; visits.set(ref.tag, v); if (v > 40) continue; // (a form drawn hundreds of times: its first uses tell enough)
+          const m = s.dict.lookup(PN('Matrix')), mm = m instanceof L.PDFArray && m.size() === 6 ? m.asArray().map(x => (x instanceof L.PDFNumber ? x.asNumber() : 0)) : [1, 0, 0, 1, 0, 0];
+          walk(bytesOf(s), s.dict.lookup(PN('Resources')) || res, mulM(mm, ctm), depth + 1);
+        }
+      }
+    }
+  };
+  for (const page of doc.getPages()) {
+    const node = page.node; let res = null; for (let n = node, k = 0; n && k < 32 && !res; n = n.lookup(PN('Parent')), k++) { const r = n.lookup(PN('Resources')); if (r instanceof L.PDFDict) res = r; }
+    const c = node.lookup(PN('Contents')), list = c instanceof L.PDFArray ? c.asArray().map(r => doc.context.lookup(r)) : c ? [c] : [], parts = list.filter(s => s instanceof L.PDFStream).map(bytesOf);
+    if (parts.some(x => !x)) continue;
+    const all = new Uint8Array(parts.reduce((a, x) => a + x.length + 1, 0)); let o = 0; for (const x of parts) { all.set(x, o); o += x.length; all[o++] = 10; }
+    walk(all, res, [1, 0, 0, 1, 0, 0], 0);
+  }
+  return use;
+}
+const isDefaultDecode = a => a.asArray().every((v, i) => v instanceof PDFLib.PDFNumber && v.asNumber() === (i % 2 ? 1 : 0));
+function lastLayer(doc, obj) { // a stream's data under all but its last filter (e.g. a JPEG wrapped in ASCII85) → { filter, parms, bytes, peeled }, or null
+  const L = PDFLib, d = obj.dict, f = d.lookup(PN('Filter')), p = d.lookup(PN('DecodeParms'));
+  if (!(f instanceof L.PDFArray)) return { filter: f || null, parms: p, bytes: obj.contents, peeled: false };
+  const n = f.size(), last = n ? f.lookup(n - 1) : null, parms = p instanceof L.PDFArray ? (n ? p.lookup(n - 1) : null) : p;
+  if (n <= 1) return { filter: last, parms, bytes: obj.contents, peeled: false };
+  if (p instanceof L.PDFArray && p.asArray().slice(0, -1).some(v => v instanceof L.PDFDict)) return null; // (outer layers with their own parameters: rare, left alone)
+  try {
+    const t = d.clone(doc.context); t.set(PN('Filter'), doc.context.obj(f.asArray().slice(0, -1))); t.delete(PN('DecodeParms'));
+    return { filter: last, parms, bytes: L.decodePDFRawStream(L.PDFRawStream.of(t, obj.contents)).decode(), peeled: true };
+  } catch (e) { return null; }
+}
+async function shrinkImage(doc, ref, obj, opt) { // opt { f: scale (≤ 1), q: JPEG quality, gray, mask: it is a soft mask (kept lossless) } → true when the picture was replaced by a smaller one
+  const L = PDFLib, dict = obj.dict, num = k => { const v = dict.lookup(PN(k)); return v instanceof L.PDFNumber ? v.asNumber() : 0; };
+  if (dict.lookup(PN('Subtype')) !== PN('Image') || dict.has(PN('ImageMask')) || dict.has(PN('Mask'))) return false;
+  const dec = dict.lookup(PN('Decode')); if (dec && !(dec instanceof L.PDFArray && isDefaultDecode(dec))) return false;
+  const w = num('Width'), h = num('Height'), f = Math.min(1, opt.f || 1); if (num('BitsPerComponent') !== 8 || w * h < 64 * 64 || obj.contents.length < 3000) return false;
+  if (opt.mask && f >= 1) return false; // a transparency mask is only ever made smaller in size, never re-encoded with losses
+  const ly = lastLayer(doc, obj); if (!ly) return false; const filter = ly.filter;
+  const cs = dict.lookup(PN('ColorSpace')); let comps = cs === PN('DeviceRGB') || cs === PN('CalRGB') ? 3 : cs === PN('DeviceGray') || cs === PN('CalGray') ? 1 : 0;
+  if (!comps && cs instanceof L.PDFArray && cs.lookup(0) === PN('ICCBased')) { const icc = cs.lookup(1), n = icc && icc.dict && icc.dict.lookup(PN('N')); comps = n instanceof L.PDFNumber ? n.asNumber() : 0; }
+  if (!comps && opt.mask && !cs) comps = 1;
   if (comps !== 1 && comps !== 3) return false; // CMYK, indexed and other special colour spaces are left alone
   let src;
-  if (filter === N('DCTDecode')) src = await createImageBitmap(new Blob([obj.contents], { type: 'image/jpeg' }));
-  else if (filter === N('FlateDecode')) {
-    const parms = dict.lookup(N('DecodeParms')), pv = parms instanceof L.PDFDict ? parms.lookup(N('Predictor')) : null, pred = pv instanceof L.PDFNumber ? pv.asNumber() : 1;
+  if (filter === PN('DCTDecode')) src = await createImageBitmap(new Blob([ly.bytes], { type: 'image/jpeg' }), { colorSpaceConversion: 'none' });
+  else if (filter === PN('FlateDecode') || !filter) {
+    const parms = ly.parms, pv = parms instanceof L.PDFDict ? parms.lookup(PN('Predictor')) : null, pred = pv instanceof L.PDFNumber ? pv.asNumber() : 1;
     if (pred !== 1 && pred < 10) return false;
-    let raw = L.decodePDFRawStream(obj).decode(); if (pred >= 10) raw = unpredict(raw, w, comps);
+    let raw = filter ? L.decodePDFRawStream(obj).decode() : obj.contents; if (pred >= 10) raw = unpredict(raw, w, comps);
     if (raw.length < w * h * comps) return false;
     const id = new ImageData(w, h), d = id.data;
     for (let i = 0, j = 0, k = 0; i < w * h; i++, j += comps, k += 4) { d[k] = raw[j]; d[k + 1] = comps === 3 ? raw[j + 1] : raw[j]; d[k + 2] = comps === 3 ? raw[j + 2] : raw[j]; d[k + 3] = 255; }
     src = document.createElement('canvas'); src.width = w; src.height = h; src.getContext('2d').putImageData(id, 0, 0);
   } else return false;
-  const f = Math.min(1, opt.max / Math.max(w, h)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * f)); c.height = Math.max(1, Math.round(h * f));
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * f)); c.height = Math.max(1, Math.round(h * f));
   const x = c.getContext('2d', { willReadFrequently: true }); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height);
+  if (src.close) src.close();
+  const set = (bytes, filterName, space) => {
+    dict.set(PN('Width'), L.PDFNumber.of(c.width)); dict.set(PN('Height'), L.PDFNumber.of(c.height)); dict.set(PN('BitsPerComponent'), L.PDFNumber.of(8)); if (space) dict.set(PN('ColorSpace'), space);
+    dict.set(PN('Filter'), PN(filterName)); dict.delete(PN('DecodeParms')); dict.delete(PN('Decode'));
+    doc.context.assign(ref, L.PDFRawStream.of(dict, bytes)); return true;
+  };
+  if (opt.mask) { // soft mask: grey levels, compressed without loss
+    const d = x.getImageData(0, 0, c.width, c.height).data, g = new Uint8Array(c.width * c.height); for (let i = 0; i < g.length; i++) g[i] = d[i * 4];
+    const z = await deflate(g); return z.length < obj.contents.length * 0.9 ? set(z, 'FlateDecode', PN('DeviceGray')) : false;
+  }
   if (opt.gray) X.applyFx(c, { mode: 'gray' });
   const bytes = new Uint8Array(await (await toBlob(c, 'image/jpeg', opt.q)).arrayBuffer());
-  if (bytes.length > obj.contents.length * 0.9) return false; // not worth it — keep the original
-  dict.set(N('Width'), L.PDFNumber.of(c.width)); dict.set(N('Height'), L.PDFNumber.of(c.height)); dict.set(N('ColorSpace'), N('DeviceRGB')); dict.set(N('BitsPerComponent'), L.PDFNumber.of(8));
-  dict.set(N('Filter'), N('DCTDecode')); dict.delete(N('DecodeParms'));
-  doc.context.assign(ref, L.PDFRawStream.of(dict, bytes)); return true;
+  if (bytes.length > obj.contents.length * (f < 1 ? 0.95 : 0.85)) return false; // not worth it — keep the original
+  return set(bytes, 'DCTDecode', comps === 3 && !opt.gray ? null : PN('DeviceRGB')); // (an RGB picture keeps its own colour profile)
+}
+function stripExtras(doc) { // page thumbnails, private editor data (Illustrator / InDesign PieceInfo) and per-object metadata — never shown, often large
+  const L = PDFLib; let n = 0;
+  if (doc.catalog.has(PN('PieceInfo'))) { doc.catalog.delete(PN('PieceInfo')); n++; }
+  for (const [, o] of doc.context.enumerateIndirectObjects()) {
+    const d = o instanceof L.PDFDict ? o : o instanceof L.PDFStream ? o.dict : null; if (!d) continue;
+    const type = d.lookup(PN('Type')), sub = d.lookup(PN('Subtype')), keys = type === PN('Page') ? ['Thumb', 'PieceInfo'] : sub === PN('Image') || sub === PN('Form') ? ['PieceInfo', 'Metadata'] : [];
+    for (const k of keys) if (d.has(PN(k))) { d.delete(PN(k)); n++; }
+  }
+  return n;
+}
+function dedupe(doc) { // identical streams (the same picture or font embedded again and again) → one shared copy
+  const L = PDFLib, ctx = doc.context, groups = new Map(), map = new Map();
+  for (const [ref, o] of ctx.enumerateIndirectObjects()) {
+    if (!(o instanceof L.PDFRawStream) || o.contents.length < 64) continue;
+    const key = o.dict.entries().filter(([k]) => k.toString() !== '/Length').map(([k, v]) => k.toString() + ' ' + v.toString()).sort().join(' ') + '|' + fnv(o.contents), g = groups.get(key);
+    if (!g) { groups.set(key, { ref, o }); continue; }
+    const a = g.o.contents, b = o.contents; let same = a.length === b.length; for (let i = 0; same && i < a.length; i++) if (a[i] !== b[i]) same = false;
+    if (same) map.set(ref.tag, g.ref);
+  }
+  if (!map.size) return 0;
+  const fix = v => (v instanceof L.PDFRef && map.has(v.tag) ? map.get(v.tag) : null);
+  const walk = o => {
+    if (o instanceof L.PDFDict) { for (const [k, v] of o.entries()) { const r = fix(v); if (r) o.set(k, r); else if (v instanceof L.PDFDict || v instanceof L.PDFArray) walk(v); } }
+    else if (o instanceof L.PDFArray) { for (let i = 0; i < o.size(); i++) { const v = o.get(i), r = fix(v); if (r) o.set(i, r); else if (v instanceof L.PDFDict || v instanceof L.PDFArray) walk(v); } }
+    else if (o instanceof L.PDFStream) walk(o.dict);
+  };
+  for (const [, o] of ctx.enumerateIndirectObjects()) walk(o);
+  for (const [ref] of ctx.enumerateIndirectObjects()) if (map.has(ref.tag)) ctx.delete(ref);
+  return map.size;
+}
+async function recompress(doc) { // streams stored without compression, or with weak old codecs (LZW, ASCII85, hex, run-length) → Flate
+  const L = PDFLib, weak = [PN('LZWDecode'), PN('ASCII85Decode'), PN('ASCIIHexDecode'), PN('RunLengthDecode')]; let n = 0;
+  for (const [ref, o] of doc.context.enumerateIndirectObjects()) {
+    if (!(o instanceof L.PDFRawStream) || o.contents.length < 200) continue;
+    const d = o.dict; if (d.lookup(PN('Type')) === PN('Metadata')) continue; // (XMP is meant to stay readable)
+    let filter = d.lookup(PN('Filter'));
+    if (filter instanceof L.PDFArray && filter.size() > 1) { // text / LZW layers around a real codec (e.g. ASCII85 + JPEG): taken off without touching the data inside
+      const fs = filter.asArray().map((v, i) => filter.lookup(i)); if (!fs.slice(0, -1).every(v => weak.includes(v))) continue;
+      const last = fs[fs.length - 1];
+      if (!weak.includes(last)) {
+        const ly = lastLayer(doc, o); if (!ly || !ly.peeled || ly.bytes.length >= o.contents.length) continue;
+        d.set(PN('Filter'), last); if (ly.parms instanceof L.PDFDict) d.set(PN('DecodeParms'), ly.parms); else d.delete(PN('DecodeParms'));
+        doc.context.assign(ref, L.PDFRawStream.of(d, ly.bytes)); n++; continue;
+      }
+      if (d.has(PN('DecodeParms'))) continue; filter = last; // (only weak layers: decoded fully and stored as Flate below)
+    } else if (filter instanceof L.PDFArray) { if (filter.size() !== 1) continue; filter = filter.lookup(0); }
+    if (filter && (!weak.includes(filter) || d.has(PN('DecodeParms')))) continue;
+    let raw; try { raw = filter ? L.decodePDFRawStream(o).decode() : o.contents; } catch (e) { continue; }
+    const z = await deflate(raw); if (z.length >= o.contents.length * 0.95) continue;
+    d.set(PN('Filter'), PN('FlateDecode')); d.delete(PN('DecodeParms')); doc.context.assign(ref, L.PDFRawStream.of(d, z)); n++;
+  }
+  return n;
+}
+async function compressPdf(bytes, opt = {}) { // → { bytes (the smaller of original and result), before, after, pictures, dups, streams, extras }
+  const L = PDFLib, o = { ...LEVELS.balanced, strip: true, ...opt }, before = bytes.length;
+  let doc; try { doc = await L.PDFDocument.load(bytes, { updateMetadata: false }); }
+  catch (e) { throw new Error(/encrypt/i.test(e.message) ? 'This PDF is password-protected — remove the password first, then compress it.' : 'Could not read this PDF: ' + e.message); }
+  const st = { before, pictures: 0, dups: 0, streams: 0, extras: o.strip ? stripExtras(doc) : 0 };
+  const merge = () => { for (let k = 0; k < 3; k++) { const n = dedupe(doc); st.dups += n; if (!n) break; } }; // (repeated: pictures sharing a merged mask become identical too)
+  merge(); // first, so every picture is only resampled once
+  let use = new Map(); try { if (X.native) use = imageUse(doc); } catch (e) { /* sizes unknown — the pixel-count rule below is used */ }
+  const items = [], masks = new Map();
+  for (const [ref, obj] of doc.context.enumerateIndirectObjects()) {
+    if (!(obj instanceof L.PDFRawStream) || obj.dict.lookup(PN('Subtype')) !== PN('Image')) continue; items.push([ref, obj]);
+    const sm = obj.dict.get(PN('SMask')); if (sm instanceof L.PDFRef) masks.set(sm.tag, ref.tag);
+  }
+  const scale = (tag, obj) => { // how much this picture can shrink and still have `dpi` pixels per inch where it is shown
+    const num = k => { const v = obj.dict.lookup(PN(k)); return v instanceof L.PDFNumber ? v.asNumber() : 0; }, w = num('Width'), h = num('Height'), u = use.get(tag) || use.get(masks.get(tag));
+    const f = u && u.w > 1 && u.h > 1 ? o.dpi / Math.min(w * 72 / u.w, h * 72 / u.h) : o.dpi * 12 / Math.max(w, h, 1); // (never seen drawn: assume up to a 12-inch picture)
+    return f < 0.9 ? f : 1;
+  };
+  for (const [ref, obj] of items) {
+    try { if (await shrinkImage(doc, ref, obj, { f: scale(ref.tag, obj), q: o.q, gray: !!o.gray, mask: masks.has(ref.tag) })) st.pictures++; } catch (e) { /* this picture stays as it is */ }
+  }
+  merge();
+  try { st.streams = await recompress(doc); } catch (e) { /* CompressionStream missing — streams stay as they are */ }
+  if (X.native) X.native.collectGarbage(doc);
+  const out = await doc.save({ useObjectStreams: true, updateFieldAppearances: false });
+  st.after = Math.min(out.length, before); st.bytes = out.length < before ? out : bytes;
+  return st;
 }
 async function compress() {
   const r = await dialog('Compress PDF', `
-    <p>Makes the file smaller by re-encoding the pictures inside it. Text stays sharp, selectable and searchable.</p>
-    <label>Compression<select name="lvl"><option value="2400|0.82">Light — best picture quality</option><option value="1600|0.68" selected>Balanced</option><option value="1100|0.5">Strong — smallest file</option></select></label>
+    <p>Makes the file smaller: pictures are resampled to the resolution they are shown at and re-encoded, duplicate copies are merged and unused data is removed. Text and drawings stay sharp, selectable and searchable.</p>
+    <label>Compression<select name="lvl">
+      <option value="light">Light — print quality (pictures at 220 dpi)</option>
+      <option value="balanced" selected>Balanced — screen and email (150 dpi)</option>
+      <option value="strong">Strong — small file (110 dpi)</option>
+      <option value="max">Maximum — smallest file (72 dpi, lower picture quality)</option></select></label>
     <label class="inl"><input type="checkbox" name="gray">Turn pictures grayscale (smaller still)</label>
-    <p class="mut">Saves a compressed copy; the document you have open is not changed. Files that are mostly text are already small.</p>`, { ok: 'Compress' });
-  if (!r) return; const [max, q] = r.lvl.split('|').map(Number);
+    <label class="inl"><input type="checkbox" name="strip" checked>Remove hidden extras (page thumbnails, editing-program data)</label>
+    <p class="mut">Saves a compressed copy; the document you have open is not changed.</p>`, { ok: 'Compress' });
+  if (!r) return;
   await busy(async () => {
-    const before = await X.buildPdf(S.pages), doc = await PDFLib.PDFDocument.load(before, { updateMetadata: false }); let n = 0;
-    for (const [ref, obj] of doc.context.enumerateIndirectObjects()) {
-      if (!(obj instanceof PDFLib.PDFRawStream)) continue;
-      try { if (await shrinkImage(doc, ref, obj, { max, q, gray: !!r.gray })) n++; } catch (e) { /* this picture stays as it is */ }
-    }
-    const after = n ? await doc.save() : before, best = after.length < before.length ? after : before, mb = v => (v / 1048576).toFixed(2) + ' MB';
-    download(new Blob([best], { type: 'application/pdf' }), X.baseName() + '-compressed.pdf');
-    toast(best === after && n ? `Compressed: ${mb(before.length)} → ${mb(after.length)} (${Math.round((1 - after.length / before.length) * 100)}% smaller, ${n} picture(s) re-encoded)` : `Already compact (${mb(before.length)}) — no pictures left to shrink`);
+    const st = await compressPdf(await X.buildPdf(S.pages), { ...(LEVELS[r.lvl] || LEVELS.balanced), gray: !!r.gray, strip: !!r.strip }), mb = v => (v / 1048576).toFixed(2) + ' MB';
+    download(new Blob([st.bytes], { type: 'application/pdf' }), X.baseName() + '-compressed.pdf');
+    const what = [st.pictures && `${st.pictures} picture${st.pictures > 1 ? 's' : ''} resampled`, st.dups && `${st.dups} duplicate${st.dups > 1 ? 's' : ''} merged`].filter(Boolean).join(', ');
+    toast(st.after < st.before ? `Compressed: ${mb(st.before)} → ${mb(st.after)} (${Math.max(1, Math.round((1 - st.after / st.before) * 100))}% smaller${what ? ' — ' + what : ''})` : `Already compact (${mb(st.before)}) — try a stronger level or grayscale`);
   }, 'Compressing…');
 }
 
 Object.assign(X.ACT, { compress, pdf2docx: pdfToDocx, pdf2img: pdfToImages, splitzip: splitZip, exporttxt: exportText, flatten });
 X.NO_DOC.add('imgpages');
-Object.assign(X, { docxToPages, pageContent, rowsOf, shrinkImage });
+Object.assign(X, { docxToPages, pageContent, rowsOf, shrinkImage, compressPdf, buildDocx, COMPRESS_LEVELS: LEVELS });
 })();

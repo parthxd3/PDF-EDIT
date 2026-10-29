@@ -124,6 +124,40 @@ async function run() {
   const boxes = p.objs.filter(o => o.type === 'text' && /box$/.test(o.text)).map(o => o.text);
   ok('add text: a click while typing finishes the box and starts the next', boxes.length === 2 && boxes[1] === 'Second box', boxes.join(','));
 
+  // ── PDF → Word "same as the PDF": the page design behind, every piece of text in a text box at its exact place ──
+  if ((await fetch('tests/samples/layout.pdf', { method: 'HEAD' })).ok) {
+    const JSZip = await X.loadLib('jszip'), docOf = async blob => { const z = await JSZip.loadAsync(blob); return { z, xml: await z.file('word/document.xml').async('string') }; };
+    p = await load('layout.pdf');
+    let { z, xml } = await docOf(await X.buildDocx(S.pages)); const boxes = (xml.match(/<wps:txbx>/g) || []).length, media = Object.keys(z.files).filter(n => n.startsWith('word/media/') && !n.endsWith('/'));
+    const words = s => s.replace(/<[^>]+>/g, '').replace(/\s+/g, ''); // (justified lines are split into words, so compare without spaces)
+    ok('to Word: text boxes, page design and all text', boxes > 15 && media.length === 1 && ['AnnualPerformanceReview', 'CONFIDENTIAL', '4,250,000', 'Smallsteps'].every(t => words(xml).includes(t)) && /w:pgSz w:w="11899"/.test(xml), `${boxes} boxes, ${media.length} picture(s)`);
+    const tc = await (await X.getPdfPage(p)).getTextContent(), it = tc.items.find(t => t.str.startsWith('1. Summary')), m = /<wp:positionH relativeFrom="page"><wp:posOffset>(-?\d+)<\/wp:posOffset><\/wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>(-?\d+)<\/wp:posOffset>(?:(?!<wp:positionH).)*?w:line="(\d+)"(?:(?!<wp:positionH).)*?>1\.(?:(?!<wp:positionH).)*?Summary/.exec(xml);
+    const bx = m && +m[1] / 12700, base = m && +m[2] / 12700 + 0.8 * +m[3] / 20, pb = it && 842 - it.transform[5];
+    ok('to Word: a heading lands on its exact spot', m && it && Math.abs(bx - it.transform[4]) < 0.5 && Math.abs(base - pb) < 0.5, m && it && `dx ${(bx - it.transform[4]).toFixed(2)}, dy ${(base - pb).toFixed(2)}`);
+    const line = (await X.getLines(p)).find(l => /Customer satisfaction/.test(l.str)); await X.editOriginal(p, line, 'Customer happiness reached a record');
+    ({ xml } = await docOf(await X.buildDocx(S.pages)));
+    ok('to Word: edits are converted, replaced text is gone', words(xml).includes('Customerhappinessreachedarecord') && !words(xml).includes('Customersatisfactionrose'));
+    p = await load('searchable.pdf'); ({ xml } = await docOf(await X.buildDocx(S.pages)));
+    ok('to Word: a scan keeps its look, its hidden text stays hidden', /w14:alpha w14:val="100000"/.test(xml) && words(xml).includes('Totalamountpayable') && /Page design/.test(xml));
+  }
+  // ── compress: pictures resampled to where they are shown, duplicates merged, transparency and text untouched ──
+  {
+    const L = PDFLib, doc = await L.PDFDocument.create(), canvasBytes = async (w, h, draw, type, q) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')); return new Uint8Array(await (await new Promise(r => c.toBlob(r, type, q))).arrayBuffer()); };
+    const photo = await canvasBytes(1800, 1200, x => { for (let i = 0; i < 1500; i++) { x.fillStyle = `hsl(${i % 360},70%,${30 + (i * 7) % 50}%)`; x.fillRect((i * 733) % 1800, (i * 397) % 1200, 40, 40); } }, 'image/jpeg', 0.95);
+    const logo = await canvasBytes(700, 700, x => { x.fillStyle = '#16a34a'; x.beginPath(); x.arc(350, 350, 300, 0, 7); x.fill(); }, 'image/png'), font = await doc.embedFont(L.StandardFonts.Helvetica);
+    for (let i = 0; i < 2; i++) { const pg = doc.addPage([595, 842]); pg.drawRectangle({ x: 0, y: 600, width: 595, height: 242, color: L.rgb(0.95, 0.85, 0.2) }); pg.drawImage(await doc.embedPng(logo), { x: 40, y: 640, width: 160, height: 160 }); pg.drawImage(await doc.embedJpg(photo), { x: 60, y: 260, width: 300, height: 200 }); pg.drawText('Compression check ' + (i + 1), { x: 60, y: 220, size: 14, font }); }
+    const src = await doc.save(), st = await X.compressPdf(src), back = await L.PDFDocument.load(st.bytes), imgs = [];
+    for (const [, o] of back.context.enumerateIndirectObjects()) if (o instanceof L.PDFRawStream && o.dict.lookup(L.PDFName.of('Subtype')) === L.PDFName.of('Image')) imgs.push(o);
+    const masks = imgs.filter(o => !o.dict.has(L.PDFName.of('SMask')) && o.dict.lookup(L.PDFName.of('ColorSpace')) === L.PDFName.of('DeviceGray'));
+    const draw1 = async b => { const pg = await (await reopen(b)).getPage(1), vp = pg.getViewport({ scale: 1 }), c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; const x = c.getContext('2d', { willReadFrequently: true }); await pg.render({ canvasContext: x, viewport: vp, intent: 'print' }).promise; return x.getImageData(0, 0, c.width, c.height).data; };
+    const A1 = await draw1(src), B1 = await draw1(st.bytes); let d = 0; for (let i = 0; i < A1.length; i += 4) if (Math.abs(A1[i] - B1[i]) + Math.abs(A1[i + 1] - B1[i + 1]) + Math.abs(A1[i + 2] - B1[i + 2]) > 90) d++; // (at screen size: a 150 dpi copy looks the same there)
+    ok('compress: pictures resampled, duplicates merged', st.after < src.length * 0.2 && imgs.length === 3 && st.dups >= 3, `${src.length} → ${st.after} bytes, ${imgs.length} pictures left`);
+    ok('compress: transparency and text kept', masks.length === 1 && (await textOf(await reopen(st.bytes), 2)) === 'Compression check 2' && d < 0.01 * A1.length / 4, `${d} of ${A1.length / 4} pixels differ`);
+    const scan = new Uint8Array(await (await fetch('tests/samples/scan.pdf')).arrayBuffer()), ss = await X.compressPdf(scan);
+    ok('compress: a 200 dpi scan shrinks to screen resolution', ss.after < scan.length * 0.5 && (await textOf(await reopen(ss.bytes))) === (await textOf(await reopen(scan))), `${scan.length} → ${ss.after}`);
+    const form = new Uint8Array(await (await fetch('tests/samples/form.pdf')).arrayBuffer()), fs = await X.compressPdf(form), fields = async b => (await (await (await reopen(b)).getPage(1)).getAnnotations()).filter(a => a.fieldType).length;
+    ok('compress: form fields survive', (await fields(fs.bytes)) === (await fields(form)) && (await fields(form)) > 0);
+  }
   // ── writing tools: offline spelling & grammar, humanize, Word round trip with formatting kept, fixes written back into the PDF ──
   if (X.writing && (await fetch('tests/samples/writing.docx', { method: 'HEAD' })).ok) {
     const WR = X.writing, W = WR.W, settle = async () => { await sleep(200); for (let k = 0; k < 100 && W.busyLint; k++) await sleep(100); };

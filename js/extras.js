@@ -145,9 +145,7 @@ async function batchDlg() {
 async function batchOne(bytes, act, wm) { // one file through the chosen action; the file is loaded as a temporary source and removed again afterwards
   const L = PDFLib;
   if (act === 'compress') {
-    const doc = await L.PDFDocument.load(bytes, { updateMetadata: false }); let n = 0;
-    for (const [ref, obj] of doc.context.enumerateIndirectObjects()) { if (!(obj instanceof L.PDFRawStream)) continue; try { if (await X.shrinkImage(doc, ref, obj, { max: 1600, q: 0.68 })) n++; } catch (e) { /* kept */ } }
-    return n ? await doc.save() : bytes;
+    return (await X.compressPdf(bytes, { ...X.COMPRESS_LEVELS.balanced, strip: true })).bytes;
   }
   const pages = await X.loadSource(bytes), si = pages[0] ? pages[0].src : -1, assets = [];
   try {
