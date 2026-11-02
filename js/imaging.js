@@ -58,7 +58,7 @@ function applyFx(c, fx) { // in place. fx: { mode: none|doc|bw|gray|sepia|invert
   ctx.putImageData(id, 0, 0); return c;
 }
 const MODES = [['none', 'Original'], ['doc', 'Enhance'], ['gray', 'Grayscale'], ['bw', 'Black & white'], ['sepia', 'Sepia'], ['invert', 'Invert']];
-const selImage = () => { const s = X.selOne(); if (!s || s.o.type !== 'image') { toast('Select an image first (use the Select tool, or Edit object to pick one up from the page)'); return null; } return s; };
+const selImage = () => { const s = X.selOne(); if (!s || s.o.type !== 'image') { toast('Select an image first (use the Select tool, or Move content to pick one up from the page)'); return null; } return s; };
 function setAsset(s, canvas, forcePng) { // bake an edited canvas back into the selected image object (undoable)
   const o = s.o, jpeg = !forcePng && /^data:image\/jpe?g/.test(S.assets[o.asset] || '');
   X.pushUndo(); o.asset = X.addAsset(canvas.toDataURL(jpeg ? 'image/jpeg' : 'image/png', 0.9)); X.drawObjs(s.p);

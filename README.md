@@ -23,7 +23,7 @@ web app, or as a Windows program — and nothing is ever uploaded.
 - **Protect** — AES password protection, permanent redaction (flatten).
 - **Insert** — images, signatures (drawn or typed), stamps, dates, watermarks; scan with the camera.
 - **Links and crop** — add links to web pages or other pages; crop pages (one, all, or all of the same size).
-- **Writing tools** — spelling and grammar checking (Harper, fully offline; US, UK, Canadian, Australian and Indian English), clarity
+- **Writing tools** — right on the home screen: paste text and check it, auto-correct every clear mistake in one click, or run the AI Humanizer; spelling and grammar checking (Harper, fully offline; US, UK, Canadian, Australian and Indian English), clarity
   hints (long sentences, passive voice, weak words, clichés), *Humanize* rewrites in a natural, casual or formal tone, readability statistics
   and text clean-up — for Word files (formatting kept: each fix goes into its own run), text files, pasted text and the open PDF (fixes are
   written back in the PDF's own font). Your dictionary is kept on the device.
@@ -72,10 +72,12 @@ js/imaging.js         image filters, background remover, scanner
 js/convert.js         Word ⇄ PDF, images, compress, flatten        js/secure.js   password protection
 js/reader.js          reading mode (text layer, links, bookmarks panel, night, selection pop-up, two-page view)
 js/writing.js         writing tools: spelling, grammar, humanize, readability, text tools (Word / text / PDF)
+js/home.js            home screen: feature cards that start each tool, the writing assistant
 js/download.js        "Download for Windows" dialog on the hosted site (reads downloads/manifest.json)
 js/docx.js            Word editor: .docx ⇄ editable page, styles, lists, tables, pictures, Fix Formatting, Auto Format, spelling marks
 js/desktop.js         Windows app extras: Default PDF app dialog, start-screen offer, how double-clicked PDFs open
 desktop/builder.json  installer settings (electron-builder);  tools/make-downloads.ps1  makes the installer, portable ZIP and manifest
+icons/logo.svg        the PDF app icon (logo-small.svg for 16–32 px); tools/make-icons.js + tools/make-ico.py render icons/*.png and desktop/icon.ico from it
 js/organize.js        page organizer        js/ui.js       theme, notifications, command palette, service worker
 lib/                  pdf.js, pdf-lib, fontkit, JSZip, fonts, OCR engine + language data, Harper grammar checker (all bundled, no CDN)
 desktop/              Electron shell for the Windows build: main.js (one running copy, files from Explorer), preload.js (the small

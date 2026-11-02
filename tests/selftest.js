@@ -124,6 +124,26 @@ async function run() {
   const boxes = p.objs.filter(o => o.type === 'text' && /box$/.test(o.text)).map(o => o.text);
   ok('add text: a click while typing finishes the box and starts the next', boxes.length === 2 && boxes[1] === 'Second box', boxes.join(','));
 
+  // ── ease of use: a click on text edits it, an untouched line leaves no trace, the toolbar keeps its height, letters draw right ──
+  if ((await fetch('tests/samples/layout.pdf', { method: 'HEAD' })).ok) {
+    p = await load('layout.pdf'); X.setTool('select'); await sleep(100);
+    const pe = X.PE.get(p.id), line = (await X.getText(p)).find(l => /company grew/.test(l.str)), m = pe.g.getScreenCTM(), cx = m.a * (line.x + 30) + m.e, cy = m.d * (line.y + line.h / 2) + m.f;
+    pe.svg.dispatchEvent(new PointerEvent('pointerdown', { clientX: cx, clientY: cy, bubbles: true, button: 0, pointerType: 'mouse' })); window.dispatchEvent(new PointerEvent('pointerup', { clientX: cx, clientY: cy, bubbles: true, pointerType: 'mouse' }));
+    for (let k = 0; k < 40 && !S.editing; k++) await sleep(100);
+    const opened = !!S.editing; X.commitEdit();
+    ok('ease: clicking text in Select mode edits it; left unchanged, nothing changes', opened && !p.objs.length && !S.dirty, `${opened} ${p.objs.length} ${S.dirty}`);
+    const o = await X.editOriginal(p, line, 'twelve this percent'); await document.fonts.ready; const cv = document.createElement('canvas').getContext('2d'), w = f => { cv.font = f; return cv.measureText('tttt').width; };
+    const own = w(`40px "XD3F ${o.font}", monospace`), look = w('40px "XD3 Carlito", monospace'); // (the document's Calibri and its look-alike have the same "t")
+    ok('ease: letters of a reused PDF font draw right ("t" is not the "ti" ligature)', Math.abs(own - look) < 2, `${own.toFixed(1)} vs ${look.toFixed(1)}`);
+    p.objs.length = 0; S.dirty = false; X.drawObjs(p);
+    const hs = new Set(); for (const t of ['select', 'edittext', 'text', 'rect', 'whiteout', 'redact']) { X.setTool(t); await sleep(30); hs.add(document.querySelector('#toolbar').offsetHeight); }
+    X.setTool('select');
+    pe.svg.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: m.a * 300 + m.e, clientY: m.d * 800 + m.f })); await sleep(250);
+    const ctxActs = [...document.querySelectorAll('#ctx [data-act]')].map(b => b.dataset.act), first = (document.querySelector('#ctx button span') || {}).textContent; document.body.click();
+    const dead = [...ctxActs, ...[...document.querySelectorAll('#mMore [data-act]')].map(b => b.dataset.act)].filter(a => !X.ACT[a]);
+    ok('ease: menus lead with the common actions and every item works', first === 'Add text here' && ctxActs.length > 8 && !dead.length, dead.join(', ') || first);
+    ok('ease: toolbar keeps its height, formatting only shows when it applies', hs.size === 1 && document.querySelector('#props').classList.contains('idle') && document.querySelector('#ctxhint').textContent.length > 10, [...hs].join(','));
+  }
   // ── PDF → Word "same as the PDF": the page design behind, every piece of text in a text box at its exact place ──
   if ((await fetch('tests/samples/layout.pdf', { method: 'HEAD' })).ok) {
     const JSZip = await X.loadLib('jszip'), docOf = async blob => { const z = await JSZip.loadAsync(blob); return { z, xml: await z.file('word/document.xml').async('string') }; };
@@ -160,7 +180,7 @@ async function run() {
   }
   // ── writing tools: offline spelling & grammar, humanize, Word round trip with formatting kept, fixes written back into the PDF ──
   if (X.writing && (await fetch('tests/samples/writing.docx', { method: 'HEAD' })).ok) {
-    const WR = X.writing, W = WR.W, settle = async () => { await sleep(200); for (let k = 0; k < 100 && W.busyLint; k++) await sleep(100); };
+    const WR = X.writing, W = WR.W, settle = async () => { await sleep(200); for (let k = 0; k < 100 && W.linting; k++) await sleep(100); };
     X.ACT.writer(); await WR.openFile(new File([await (await fetch('tests/samples/writing.docx')).blob()], 'writing.docx')); await settle();
     const found = W.paras.flatMap(q => (q.issues || []).map(i => i.word));
     ok('writing: spelling and grammar found offline', ['Quartely', 'importent', 'sentense', 'The the'].every(w => found.includes(w)), found.join(', '));
@@ -174,6 +194,13 @@ async function run() {
     const q = W.paras.find(x => /lazy dog/.test(x.text)); q.text = q.text.replace('lazy dog', 'sleepy dog'); await WR.applyToPdf(); WR.close();
     tx = await textOf(await reopen(await X.buildPdf(S.pages)));
     ok('writing: fix written back into the PDF in its own font', /sleepy dog/.test(tx) && !/lazy dog/.test(tx) && /running through the quiet forest/.test(tx));
+    await WR.openWith([{ text: 'It was definately usefull and we should of known.', issues: [] }], 'text', 'autofix'); const nfix = await WR.fixIssues('all');
+    ok('writing: auto-correct picks the right word', W.paras[0].text === 'It was definitely useful and we should have known.' && nfix === 3, W.paras[0].text); WR.close();
+  }
+  { // home screen: every card and writing button starts a tool that exists
+    const acts = [...document.querySelectorAll('#welcome [data-act]')].map(b => b.dataset.act === 'h_need' ? b.dataset.a : b.dataset.act), menus = Object.values(X.home.MENUS).flatMap(f => f()).filter(it => it !== '-').map(it => it.d && it.d.a || it.act);
+    const missing = [...acts, ...menus].filter(a => !X.ACT[a]);
+    ok('home: every card and writing button is wired to a tool', acts.length >= 20 && !missing.length, missing.join(', ') || acts.length + ' buttons');
   }
   // ── viewing: two pages side by side ──
   X.ACT.spread(); ok('view: two pages side by side', document.body.classList.contains('spread')); X.ACT.spread();

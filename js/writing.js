@@ -10,7 +10,7 @@ const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { 
 const W = {
   paras: [], kind: 'text', name: 'document', zip: null, xml: null, pdf: null, open: false,
   dialect: store.get('xd3.dialect') || 'American', style: store.get('xd3.style') !== 'off', tab: 'issues', tone: 'natural',
-  dict: JSON.parse(store.get('xd3.dict') || '[]'), ignored: new Set(), undo: [], redo: [], rewrites: [], busyLint: false,
+  dict: JSON.parse(store.get('xd3.dict') || '[]'), ignored: new Set(), undo: [], redo: [], rewrites: [], linting: null,
 };
 
 /* ───────── workspace ───────── */
@@ -75,28 +75,70 @@ function styleIssues(text) {
 
 /* ───────── checking ───────── */
 const keyOf = is => is.kind + ':' + is.word.toLowerCase();
+async function oneWord(L, word) { // a real word one letter away (a doubled letter dropped first, then any letter, then two swapped), or null
+  const w = word.toLowerCase(), out = [], seen = new Set(), add = c => { if (c.length > 2 && !seen.has(c)) { seen.add(c); out.push(c); } };
+  for (let i = 1; i < w.length; i++) if (w[i] === w[i - 1]) add(w.slice(0, i) + w.slice(i + 1));
+  for (let i = 0; i < w.length; i++) add(w.slice(0, i) + w.slice(i + 1));
+  for (let i = 0; i < w.length - 1; i++) add(w.slice(0, i) + w[i + 1] + w[i] + w.slice(i + 2));
+  for (const c of out.slice(0, 24)) {
+    const ls = await L.lint(c, { language: 'plaintext' }), ok = !ls.length; ls.forEach(l => l.free());
+    if (ok) return word[0] === word[0].toUpperCase() ? c[0].toUpperCase() + c.slice(1) : c;
+  }
+  return null;
+}
 async function lintPara(p) {
   const text = p.text; p.issues = []; if (!text.trim()) return;
   const L = await engine(), lints = await L.lint(text, { language: 'plaintext' }), at = cpIndex(text);
   for (const l of lints) {
     const s = l.span(), a = at(s.start), b = at(s.end), word = text.slice(a, b), kind = l.lint_kind();
     const sug = [...new Set(l.suggestions().map(x => { const k = x.kind(), r = x.get_replacement_text(); x.free(); return k === 1 ? '' : k === 2 ? word + r : r; }))].slice(0, 5);
+    if ((kind === 'Spelling' || kind === 'Typo') && /^[A-Za-z]{4,}$/.test(word) && sug.length && sug.every(x => /\s/.test(x))) { const one = await oneWord(L, word); if (one) sug.unshift(one); } // ("usefull": the checker only offers "use full")
     p.issues.push({ kind, pretty: l.lint_kind_pretty(), msg: l.message(), a, b, word, sug }); l.free();
   }
   if (W.style) for (const is of styleIssues(text)) { is.word = text.slice(is.a, is.b); if (!p.issues.some(o => o.a < is.b && is.a < o.b && o.kind !== 'Clarity')) p.issues.push(is); }
   p.issues = p.issues.filter(is => !W.ignored.has(keyOf(is))).sort((x, y) => x.a - y.a || y.b - x.b);
 }
-async function lintAll() {
-  if (W.busyLint) return; W.busyLint = true; const badge = $('#wrCount'); badge.textContent = '…';
-  try {
-    await engine(); const t0 = performance.now();
-    for (let i = 0; i < W.paras.length; i++) { await lintPara(W.paras[i]); if (performance.now() - t0 > 40) { await new Promise(r => setTimeout(r)); } } // (stays responsive on long documents)
-    W.paras.forEach((p, i) => renderPara(i)); renderSide();
-  } catch (e) { toast(e.message, true); badge.textContent = '!'; }
-  finally { W.busyLint = false; }
+function lintAll() { // one check at a time; callers can wait for the running one
+  if (W.linting) return W.linting;
+  const badge = $('#wrCount'); badge.textContent = '…';
+  return W.linting = (async () => {
+    try {
+      await engine(); const t0 = performance.now();
+      for (let i = 0; i < W.paras.length; i++) { await lintPara(W.paras[i]); if (performance.now() - t0 > 40) { await new Promise(r => setTimeout(r)); } } // (stays responsive on long documents)
+      W.paras.forEach((p, i) => renderPara(i)); renderSide();
+    } catch (e) { toast(e.message, true); badge.textContent = '!'; }
+  })().finally(() => { W.linting = null; });
 }
 const CAT = k => k === 'Spelling' || k === 'Typo' ? 'spell' : k === 'Clarity' ? 'style' : /Style|Readability|Redundancy|Repetition|WordChoice|Enhancement/.test(k) ? 'improve' : 'grammar';
 const CATNAME = { spell: 'Spelling', grammar: 'Grammar', improve: 'Word choice', style: 'Clarity' };
+// can this issue be fixed without asking? one suggestion; or, for a misspelt everyday word (not a name, not a code), its best suggestion
+const fixable = is => !!is.sug[0] && CAT(is.kind) !== 'style' && (is.sug.length === 1 || (CAT(is.kind) === 'spell' && /^[a-z][a-z'’-]*$/.test(is.word)));
+const dist = (a, b) => { // edit distance (with swaps), for choosing the closest spelling suggestion
+  const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]); for (let j = 1; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) { d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1); }
+  return d[m][n];
+};
+const bestSug = is => { // one suggestion: that one; a misspelling: the closest word, preferring one word over a split ("usefull" → "useful", not "use full")
+  if (is.sug.length === 1 || CAT(is.kind) !== 'spell') return is.sug[0];
+  const w = is.word.toLowerCase(), split = s => (s.match(/\s/g) || []).length - (w.match(/\s/g) || []).length;
+  return is.sug.map((s, k) => ({ s, k, sp: split(s) > 0 ? 1 : 0, d: dist(w, s.toLowerCase()) })).sort((x, y) => x.sp - y.sp || x.d - y.d || x.k - y.k)[0].s;
+};
+const FIXSET = { spell: k => k === 'spell', grammar: k => k === 'grammar' || k === 'improve', all: () => true };
+async function fixIssues(what = 'all') { // → number of fixes; two passes, since one fix can reveal the next
+  await lintAll(); remember(); let n = 0;
+  for (let pass = 0; pass < 2; pass++) {
+    let m = 0;
+    for (const [i, p] of W.paras.entries()) {
+      const q = (p.issues || []).filter(is => fixable(is) && FIXSET[what](CAT(is.kind))).sort((x, y) => y.a - x.a); let lim = Infinity, done = 0;
+      for (const is of q) { if (is.b > lim) continue; p.text = p.text.slice(0, is.a) + bestSug(is) + p.text.slice(is.b); lim = is.a; done++; } // (overlapping fixes: only the first)
+      if (done) { m += done; await lintPara(p).catch(() => {}); renderPara(i); }
+    }
+    n += m; if (!m) break;
+  }
+  renderSide(); return n;
+}
+const fixAct = what => async () => { const n = await fixIssues(what); toast(n ? `${n} ${what === 'spell' ? 'spelling mistake' : what === 'grammar' ? 'grammar issue' : 'issue'}${n > 1 ? 's' : ''} fixed — Ctrl+Z to undo` : 'Nothing left to fix automatically', n ? '' : 'info'); };
+function setTab(t) { W.tab = t; $$('.wr-tabs button', box).forEach(x => x.classList.toggle('on', x.dataset.wt === t)); renderSide(); }
 
 /* ───────── the document view ───────── */
 function renderPara(i) {
@@ -177,12 +219,12 @@ function renderSide() {
   const list = allIssues(); $('#wrCount').textContent = list.length;
   if (W.tab === 'issues') {
     const by = {}; for (const x of list) (by[CAT(x.is.kind)] = by[CAT(x.is.kind)] || []).push(x);
-    const quick = list.filter(x => x.is.sug.length === 1 && x.is.sug[0] && CAT(x.is.kind) !== 'style');
+    const quick = list.filter(x => fixable(x.is)), nS = quick.filter(x => CAT(x.is.kind) === 'spell').length, nG = quick.filter(x => FIXSET.grammar(CAT(x.is.kind))).length;
     pane.innerHTML = `<div class="wchips">${Object.keys(CATNAME).map(c => `<span class="wchip wm-${c}">${CATNAME[c]} <b>${(by[c] || []).length}</b></span>`).join('')}</div>
       <label class="inl wopt"><input type="checkbox" id="wrStyle"${W.style ? ' checked' : ''}>Clarity suggestions (long sentences, passive voice, weak words, clichés)</label>
-      ${quick.length ? `<button class="btn line wfull" data-w="fixall">Fix ${quick.length} clear-cut issue(s)</button>` : ''}
+      ${quick.length ? `<div class="wfixes"><button class="btn primary" data-w="fixall" title="Fix every spelling and grammar issue that has a clear correction"><i data-icon="wand"></i><span>Fix all ${quick.length}</span></button>${nS ? `<button class="btn line" data-w="fixspell"><i data-icon="spell"></i><span>Spelling ${nS}</span></button>` : ''}${nG ? `<button class="btn line" data-w="fixgram"><i data-icon="check"></i><span>Grammar ${nG}</span></button>` : ''}</div>` : ''}
       <div class="wcards">${list.length ? list.slice(0, 400).map(({ i, n, is }) => `<div class="wcard wm-${CAT(is.kind)}" data-i="${i}" data-n="${n}"><div class="wck wm-${CAT(is.kind)}">${esc(is.pretty)}</div><div class="wcw">${esc(is.word.length > 60 ? is.word.slice(0, 60) + '…' : is.word)}</div><div class="wcm">${esc(is.msg)}</div>${is.sug.length ? `<div class="wps">${is.sug.slice(0, 3).map((s, k) => `<button data-s="${k}">${s ? esc(s) : '<i>remove</i>'}</button>`).join('')}</div>` : ''}</div>`).join('') : `<div class="empty">${W.paras.length ? 'No issues found. 🎉' : 'Nothing to check yet.'}</div>`}</div>`;
-    $('#wrStyle').onchange = e => { W.style = e.target.checked; store.set('xd3.style', W.style ? 'on' : 'off'); lintAll(); };
+    icons(pane); $('#wrStyle').onchange = e => { W.style = e.target.checked; store.set('xd3.style', W.style ? 'on' : 'off'); lintAll(); };
   } else if (W.tab === 'human') renderHuman();
   else if (W.tab === 'stats') renderStats();
   else renderTools();
@@ -195,7 +237,7 @@ pane.addEventListener('click', async e => {
     const m = page.children[i].querySelector(`mark[data-n="${card.dataset.n}"]`); if (m) { m.scrollIntoView({ block: 'center', behavior: 'smooth' }); X.flash(m, 'wflash'); setTimeout(() => showPop(m), 250); }
   }
 });
-$$('.wr-tabs button', box).forEach(b => b.onclick = () => { W.tab = b.dataset.wt; $$('.wr-tabs button', box).forEach(x => x.classList.toggle('on', x === b)); renderSide(); });
+$$('.wr-tabs button', box).forEach(b => b.onclick = () => setTab(b.dataset.wt));
 
 /* ───────── humanize: plain, natural wording ───────── */
 const RE = s => new RegExp(`\\b${s}\\b`, 'gi');
@@ -419,7 +461,7 @@ const ACTS = {
   paste: async () => { let t = ''; try { t = await navigator.clipboard.readText(); } catch (e) { /* no clipboard access */ } await openWith((t || '').replace(/\r\n?/g, '\n').split('\n').map(text => ({ text, orig: text, issues: [] })), 'text', 'text'); if (!t) { const el = page.querySelector('.wp'); if (el) el.focus(); toast('Type or paste your text', 'info'); } },
   pdf: async () => { if (!S.pages.length) return toast('Open a PDF first'); await busy(async () => openWith(await loadPdf(), 'pdf', X.baseName()), 'Reading the PDF…'); },
   undo: undoW, redo: redoW, close,
-  fixall: async () => { remember(); let n = 0; for (const [i, p] of W.paras.entries()) { const q = (p.issues || []).filter(is => is.sug.length === 1 && is.sug[0] && CAT(is.kind) !== 'style').sort((x, y) => y.a - x.a); for (const is of q) { p.text = p.text.slice(0, is.a) + is.sug[0] + p.text.slice(is.b); n++; } if (q.length) { await lintPara(p).catch(() => {}); renderPara(i); } } renderSide(); toast(`${n} issue(s) fixed — Ctrl+Z to undo`); },
+  fixall: fixAct('all'), fixspell: fixAct('spell'), fixgram: fixAct('grammar'),
   acceptall: acceptAll,
   save: () => {
     if (!W.paras.length) return toast('Nothing to save yet');
@@ -440,5 +482,5 @@ Object.assign(X.ACT, {
 });
 X.NO_DOC.add('writer'); ['w_docx', 'w_txt', 'w_copy', 'w_pdf'].forEach(a => X.NO_DOC.add(a));
 X.openInWriter = async file => { show(); await openFile(file); };
-X.writing = { W, engine, lintAll, loadDocx, buildDocx, changes, splice, openWith, rewrites, styleIssues, statsHtml, dictAdd, applyToPdf, show, close, openFile };
+X.writing = { W, ACTS, setTab, fixIssues, engine, lintAll, loadDocx, buildDocx, changes, splice, openWith, rewrites, styleIssues, statsHtml, dictAdd, applyToPdf, show, close, openFile };
 })();

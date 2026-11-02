@@ -54,6 +54,50 @@ const cleanFontName = n => {
   return s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[^\w .-]/g, '').trim() || 'Document font';
 };
 function xfId(name, bytes) { let h = 2166136261 ^ bytes.length; const st = Math.max(1, bytes.length >> 11); for (let i = 0; i < bytes.length; i += st) h = Math.imul(h ^ bytes[i], 16777619); for (const ch of name) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return 'pf' + (h >>> 0).toString(36); }
+// pdf.js hands over a document font with its glyphs filed under the PDF's own character codes, and for CID fonts (Chrome, Edge,
+// Word) a few real letters end up on the wrong glyph — "t" drawn as the "ti" ligature, so "this" shows as "tihis". The font's
+// character map is rebuilt from pdf.js' own maps (code → letter, code → glyph slot): every single letter points at its glyph.
+function fixCmap(bytes, f) {
+  try {
+    const tu = f && f.toUnicode && f.toUnicode._map, tfc = f && f.toFontChar; if (!tu || !tfc) return bytes;
+    const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), n = v.getUint16(4), T = {};
+    for (let i = 0; i < n; i++) { const o = 12 + 16 * i; T[String.fromCharCode(bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3])] = { off: v.getUint32(o + 8), len: v.getUint32(o + 12), o }; }
+    if (!T.cmap) return bytes;
+    const old = new Map(), c0 = T.cmap.off, nt = v.getUint16(c0 + 2);
+    for (let k = 0; k < nt; k++) { // every Unicode / Windows subtable of the old map, formats 4 and 12
+      const pid = v.getUint16(c0 + 4 + 8 * k), st = c0 + v.getUint32(c0 + 8 + 8 * k), fmt = v.getUint16(st); if (pid === 1) continue;
+      if (fmt === 4) {
+        const sc = v.getUint16(st + 6) / 2, E = st + 14, S0 = E + 2 * sc + 2, D = S0 + 2 * sc, R = D + 2 * sc;
+        for (let i = 0; i < sc; i++) { const e = v.getUint16(E + 2 * i), s0 = v.getUint16(S0 + 2 * i), d = v.getUint16(D + 2 * i), ro = v.getUint16(R + 2 * i); if (s0 === 0xFFFF) continue;
+          for (let c = s0; c <= e; c++) { let g = ro ? v.getUint16(R + 2 * i + ro + 2 * (c - s0)) : c; if (ro && g) g += d; else if (!ro) g = c + d; g &= 0xFFFF; if (g && !old.has(c)) old.set(c, g); } }
+      } else if (fmt === 12) {
+        const ng = v.getUint32(st + 12); for (let i = 0; i < ng; i++) { const a = v.getUint32(st + 16 + 12 * i), b = v.getUint32(st + 20 + 12 * i), g = v.getUint32(st + 24 + 12 * i); for (let c = a; c <= b && c - a < 65536; c++) if (!old.has(c)) old.set(c, g + c - a); }
+      }
+    }
+    const map = new Map(old), fixed = new Set();
+    tu.forEach((u, code) => { // a code that stands for exactly one letter: that letter is drawn with its glyph (ligatures such as "ti" keep only their private slot)
+      if (typeof u !== 'string') return; const cps = [...u]; if (cps.length !== 1) return; const cp = cps[0].codePointAt(0), g = old.get(tfc[code]);
+      if (g && !fixed.has(cp)) { map.set(cp, g); fixed.add(cp); }
+    });
+    if (!fixed.size) return bytes;
+    const cps = [...map.keys()].sort((a, b) => a - b), bmp = cps.filter(c => c < 0xFFFF), sc = bmp.length + 1;
+    const f4 = new DataView(new ArrayBuffer(16 + 8 * sc)), es = Math.floor(Math.log2(sc)), sr = 2 * 2 ** es;
+    f4.setUint16(0, 4); f4.setUint16(2, f4.byteLength); f4.setUint16(6, 2 * sc); f4.setUint16(8, sr); f4.setUint16(10, es); f4.setUint16(12, 2 * sc - sr);
+    [...bmp, 0xFFFF].forEach((c, i) => { const g = c === 0xFFFF ? 0 : map.get(c); f4.setUint16(14 + 2 * i, c); f4.setUint16(16 + 2 * sc + 2 * i, c); f4.setUint16(16 + 4 * sc + 2 * i, c === 0xFFFF ? 1 : (g - c) & 0xFFFF); });
+    const f12 = new DataView(new ArrayBuffer(16 + 12 * cps.length)); f12.setUint16(0, 12); f12.setUint32(4, f12.byteLength); f12.setUint32(12, cps.length);
+    cps.forEach((c, i) => { f12.setUint32(16 + 12 * i, c); f12.setUint32(20 + 12 * i, c); f12.setUint32(24 + 12 * i, map.get(c)); });
+    const cm = new Uint8Array(20 + f4.byteLength + f12.byteLength), cv = new DataView(cm.buffer); cv.setUint16(2, 2);
+    cv.setUint16(4, 3); cv.setUint16(6, 1); cv.setUint32(8, 20); cv.setUint16(12, 3); cv.setUint16(14, 10); cv.setUint32(16, 20 + f4.byteLength);
+    cm.set(new Uint8Array(f4.buffer), 20); cm.set(new Uint8Array(f12.buffer), 20 + f4.byteLength);
+    const tags = Object.keys(T).sort(), data = tags.map(t => t === 'cmap' ? cm : bytes.subarray(T[t].off, T[t].off + T[t].len)), pad = x => (x + 3) & ~3;
+    const out = new Uint8Array(12 + 16 * tags.length + data.reduce((a, d) => a + pad(d.length), 0)), ov = new DataView(out.buffer), e2 = Math.floor(Math.log2(tags.length));
+    out.set(bytes.subarray(0, 4)); ov.setUint16(4, tags.length); ov.setUint16(6, 16 * 2 ** e2); ov.setUint16(8, e2); ov.setUint16(10, 16 * tags.length - 16 * 2 ** e2);
+    let at = 12 + 16 * tags.length;
+    tags.forEach((t, i) => { const d = data[i], r = 12 + 16 * i; out.set(d, at); let sum = 0; for (let k = 0; k < pad(d.length); k += 4) sum = (sum + ov.getUint32(at + k)) >>> 0;
+      for (let k = 0; k < 4; k++) out[r + k] = t.charCodeAt(k); ov.setUint32(r + 4, t === 'cmap' ? sum : v.getUint32(T[t].o + 4)); ov.setUint32(r + 8, at); ov.setUint32(r + 12, d.length); at += pad(d.length); });
+    return out;
+  } catch (e) { console.warn('font map not rebuilt', e); return bytes; }
+}
 function useXFont(id) { // register a document font with the browser so it can be measured and drawn
   const x = S.xfonts[id]; if (!x) return Promise.resolve(); if (xfReady[id]) return xfReady[id];
   FONTS[id] = `"XD3F ${id}", ${FONTS[x.fb] || FONTS.Helvetica}`;
@@ -75,6 +119,7 @@ const ICONS = {
   split: 'M12 4v6M12 10l-6 6v4M12 10l6 6v4', image: 'M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M9 9h.01',
   sign: 'M3 17c2-6 4-10 6-10s-1 9 2 9 3-6 5-6 1 4 5 4M3 21h18', drop: 'M12 3s6 6 6 11a6 6 0 0 1-12 0c0-5 6-11 6-11z',
   hash: 'M5 9h14M5 15h14M10 4L8 20M16 4l-2 16', stamp: 'M5 21h14M6 17h12v-3H6zM10 14V9a2 2 0 1 1 4 0v5',
+  sparkle: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z', pdf: 'M6 3h9l5 5v13H6zM15 3v5h5M8.5 17v-4h1.5a1.2 1.2 0 0 1 0 2.4H8.5M13 13v4h1a2 2 0 0 0 0-4zM18 13h-1.8v4M16.2 15h1.4',
   check: 'M5 12l5 5L20 7', x: 'M6 6l12 12M18 6L6 18', more: 'M5 12h.01M12 12h.01M19 12h.01',
   info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7h.01', key: 'M3 7h18v10H3zM7 11h.01M11 11h.01M15 11h.01M8 14h8',
   panel: 'M3 5h18v14H3zM9 5v14', moon: 'M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10z',
@@ -102,10 +147,10 @@ const ICONS = {
   bold: 'M7 4.5h6a3.75 3.75 0 0 1 0 7.5H7zM7 12h7a3.75 3.75 0 0 1 0 7.5H7z', italic: 'M10 4.5h8M6 19.5h8M14 4.5l-4 15', underline: 'M7 4v7a5 5 0 0 0 10 0V4M5 20.5h14', strike: 'M4 12h16M16.5 7A4.5 4.5 0 0 0 12 4.5c-2.6 0-4.3 1.4-4.3 3.3 0 1.1.6 2 1.8 2.7M7.5 17A4.8 4.8 0 0 0 12 19.5c2.7 0 4.6-1.4 4.6-3.5 0-.7-.2-1.3-.6-1.8', sup: 'M4 8l7 11M11 8l-7 11M15 4.6c.4-.9 1.2-1.6 2.3-1.6 1.2 0 2.1.8 2.1 1.9 0 1.8-4.4 2.4-4.4 4.6h4.6', sub: 'M4 5l7 11M11 5l-7 11M15 14.6c.4-.9 1.2-1.6 2.3-1.6 1.2 0 2.1.8 2.1 1.9 0 1.8-4.4 2.4-4.4 4.6h4.6', fcolor: 'M6.5 15.5L12 3.5l5.5 12M8.6 11h6.8', hlpen: 'M15 4l5 5-8.5 8.5H6.5v-5zM12.5 6.5l5 5M4 21h8', clearfmt: 'M6 4.5h12M12.5 4.5L9 15M14 15l6 6M20 15l-6 6M4 19h6', alignjust: 'M4 6h16M4 10h16M4 14h16M4 18h16', listbul: 'M9.5 6H20M9.5 12H20M9.5 18H20M4.5 6h.5M4.5 12h.5M4.5 18h.5', listnum: 'M10 6h10M10 12h10M10 18h10M4 4.5h1.4V9M3.8 9h3M4 14.2a1.4 1.4 0 0 1 2.7.5c0 1.2-2.8 1.6-2.8 3.3h2.9', indent: 'M4 5h16M11 10h9M11 14h9M4 19h16M4 9.5l3.5 2.5L4 14.5', outdent: 'M4 5h16M11 10h9M11 14h9M4 19h16M7.5 9.5L4 12l3.5 2.5', linesp: 'M11 6h9M11 12h9M11 18h9M5.5 4v16M3 6.5l2.5-2.5L8 6.5M3 17.5L5.5 20 8 17.5', table: 'M3.5 5h17v14h-17zM3.5 10h17M3.5 15h17M9.2 5v14M14.8 5v14', pbreak: 'M6 3v5h12V3M6 21v-5h12v5M3 12h2.5M8 12h3M13 12h3M18.5 12H21', pagesetup: 'M6 3h9l4 4v14H6zM15 3v4h4M9 11h6M9 15h6', pilcrow: 'M13 4v16M17 4v16M19 4H9.5a4.5 4.5 0 0 0 0 9H13', toc: 'M4 6h16M7 10h13M10 14h10M7 18h13', hf: 'M5 3h14v18H5zM5 7h14M5 17h14', omega: 'M5 19h4.5v-2.2A6.5 6.5 0 1 1 14.5 16.8V19H19',
 };
 const HINTS = {
-  select: 'Click to select · drag to move · corner handles resize · top handle rotates · Shift+click or drag a box to select several · double‑click text to edit',
+  select: 'Click any text to change it · click something you added to move or resize it · drag on empty space to select several',
   hand: 'Drag to pan around the document',
-  edittext: 'Click any outlined text to rewrite it — the original font, size and colour are kept · text inside scans and pictures is recognised automatically (OCR) · ¶ Paragraphs edits whole blocks',
-  editobj: 'Click an outlined image, or drag a box around anything on the page (it snaps to the content), to pick it up — then move, resize, rotate or delete it',
+  edittext: 'Click any outlined line to change it — it keeps its own font, size and colour · text in scans is read automatically · ¶ Paragraphs edits whole blocks',
+  editobj: 'Click a picture, or drag a box around anything on the page, to move, resize, rotate or delete it',
   text: 'Click anywhere to add text · change font, size and colour in the bar above while typing',
   note: 'Click to place a sticky note',
   pen: 'Draw freehand', marker: 'Drag over content to highlight freehand', hl: 'Drag a box to highlight an area',
@@ -113,7 +158,7 @@ const HINTS = {
   line: 'Drag to draw a line (Shift = 45° steps)', arrow: 'Drag to draw an arrow (Shift = 45° steps)',
   link: 'Drag a box over the words or picture that should become a link — to a website or to another page',
   crop: 'Drag a box around the part of the page to keep — the rest is trimmed away when you save',
-  whiteout: 'Drag a box to cover content with white', redact: 'Drag a box to black out content — when you save, pages with blackouts become pictures so the hidden text is really gone',
+  whiteout: 'Drag a box to cover content with white', redact: 'Drag a box over anything sensitive — it is removed for good when you save',
 };
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -311,7 +356,7 @@ async function openFiles(files, append, opt = {}) {
       setTool('select'); syncControls(); updateUI(); scheduleSave();
     }
     if (append) toast(`Added ${files.length} file(s)`);
-    else { if (window.XD3.noteRecent) window.XD3.noteRecent(files); if (window.XD3.onDocOpened) window.XD3.onDocOpened(); }
+    else { if (window.XD3.noteRecent) window.XD3.noteRecent(files); if (window.XD3.onDocOpened) window.XD3.onDocOpened(); document.dispatchEvent(new Event('xd3:opened')); }
   }, 'Opening…');
 }
 function newDoc() {
@@ -342,6 +387,7 @@ function buildPages() {
     const pe = { wrap, canvas, svg: s, g, gFind: svg('g', {}, g), gTI: svg('g', {}, g), gObjs: svg('g', {}, g), gUI: svg('g', {}, g), key: '' };
     wrap.append(canvas, s); viewer.appendChild(wrap); PE.set(p.id, pe);
     s.addEventListener('pointerdown', e => onDown(e, p.id));
+    s.addEventListener('pointermove', e => hoverText(e, p.id)); s.addEventListener('pointerleave', () => hoverText(null, p.id));
     s.addEventListener('dblclick', e => {
       const oe = e.target.closest('[data-id]'); if (!oe || S.editing) return;
       const pg = pageById(p.id), o = pg.objs.find(x => x.id === oe.dataset.id);
@@ -563,7 +609,7 @@ function onDown(e, pid) {
   hideCtx();
   if (e.button !== 0) return;
   if (e.target.closest('.txed')) return;
-  if (S.editing) { commitEdit(); if (!['text', 'note', 'edittext'].includes(S.tool)) { e.preventDefault(); return; } } // with a text tool, the click also places / opens the next box
+  if (S.editing) { commitEdit(); if (!['text', 'note', 'edittext', 'select'].includes(S.tool)) { e.preventDefault(); return; } } // with a text tool (or Select), the click also places / opens the next box
   const p = pageById(pid), pe = PE.get(pid), P = toPt(e, pe), tool = S.tool;
   const oe = e.target.closest('[data-id]'), hit = oe && p.objs.find(x => x.id === oe.dataset.id);
   if (tool === 'hand') drag = { kind: 'pan', cx: e.clientX, cy: e.clientY, st: viewer.scrollTop, sl: viewer.scrollLeft };
@@ -575,7 +621,7 @@ function onDown(e, pid) {
       if (e.shiftKey) { select(pid, cur.includes(hit.id) ? cur.filter(i => i !== hit.id) : [...cur, hit.id]); e.preventDefault(); return; }
       if (!cur.includes(hit.id)) select(pid, hit.id);
       const s = selObjs(); drag = { kind: 'move', p, os: s.os, srcs: s.os.map(clone) };
-    } else { select(null); if (e.pointerType === 'touch') return; drag = { kind: 'marq', p }; }
+    } else { select(null); if (e.pointerType === 'touch') { textItemAt(p, P).then(i => { if (i >= 0) convertTextItem(p, i); }); return; } drag = { kind: 'marq', p }; }
   } else if (tool === 'text' || tool === 'note') {
     e.preventDefault();
     if (hit && hit.type === 'text') return startEdit(p, hit, snap());
@@ -656,7 +702,7 @@ function onUp() {
   if (d.kind === 'marq' || d.kind === 'region') {
     const P = d.last || d.start, r = { x: Math.min(d.start[0], P[0]), y: Math.min(d.start[1], P[1]), w: Math.abs(P[0] - d.start[0]), h: Math.abs(P[1] - d.start[1]) };
     const big = Math.max(r.w, r.h) * scaleCss() > 6;
-    if (d.kind === 'marq') { if (big) select(d.p.id, d.p.objs.filter(o => hitsRect(bbox(o), r)).map(o => o.id)); }
+    if (d.kind === 'marq') { if (big) select(d.p.id, d.p.objs.filter(o => hitsRect(bbox(o), r)).map(o => o.id)); else { const pe = PE.get(d.p.id); if (pe && pe.hov) { pe.hov.remove(); pe.hov = null; } textItemAt(d.p, d.start).then(i => { if (i >= 0) convertTextItem(d.p, i); }); } } // a plain click on the document's text edits it
     else if (big) convertRegion(d.p, r);
     else if (d.im >= 0) getImages(d.p).then(a => a[d.im] && convertRegion(d.p, a[d.im], a[d.im]));
     else toast('Drag a box around the content you want to pick up');
@@ -708,7 +754,9 @@ function commitEdit() {
   if (o) {
     if (text.trim() === '') p.objs = p.objs.filter(x => x !== o);
     else { o.text = text; if (o.rot && tl) { const w = rotP([o.x, o.y], center(bbox(o)), o.rot); o.x += tl[0] - w[0]; o.y += tl[1] - w[1]; } }
+    if (S.freshEdit === id && o.orig && untouched(o) === o.orig) p.objs = p.objs.filter(x => x !== o && x.link !== id); // opened but left exactly as it was: the page goes back to its original
   }
+  S.freshEdit = null;
   if (snap() !== before) pushUndo(before);
   drawObjs(p); syncControls(); if (S.tool === 'edittext') drawTI(p);
 }
@@ -895,7 +943,7 @@ async function origFont(p, it, light) { // the typeface an original line is set 
   const out = { font: fb, bold, italic, real: name ? cleanFontName(name) : '', ps: name, family: fam, type3: !!(f && f.isType3Font) };
   if (!light && f && f.data && f.data.length > 200 && !f.isType3Font) { // embedded in the PDF → keep using that very font
     const bytes = new Uint8Array(f.data), id = xfId(name, bytes);
-    if (!S.xfonts[id]) S.xfonts[id] = { name: out.real, ps: name, bytes, bold, italic, fb };
+    if (!S.xfonts[id]) S.xfonts[id] = { name: out.real, ps: name, bytes: fixCmap(bytes, f), bold, italic, fb };
     await useXFont(id); out.font = id;
   }
   return s.fonts[key] = out;
@@ -948,7 +996,25 @@ const untouched = o => JSON.stringify(UNTOUCHED.map(k => o[k] ?? null));
 async function convertTextItem(p, i) {
   const pe = PE.get(p.id), it = (pe && pe.items ? pe.items : S.para ? await getBlocks(p) : await getText(p))[i]; if (!it) return;
   if (it.field) return window.XD3.fillField(p, it);
-  const before = snap(), o = await editOriginal(p, it); startEdit(p, o, before, true);
+  const before = snap(), o = await editOriginal(p, it); S.freshEdit = o.id; startEdit(p, o, before, true);
+}
+async function ctxItem() { const c = S.ctxTI, p = c && pageById(c.pid), pe = c && PE.get(c.pid); if (!p) return null; return (pe && pe.items ? pe.items : S.para ? await getBlocks(p) : await getText(p))[c.i] || null; } // the line a right-click menu is about
+async function textItemAt(p, P) { // the document's own text under a point (a line, or a paragraph in ¶ mode) → its index in the editable list, or -1
+  if (!p || p.src < 0) return -1;
+  const list = S.para ? await getBlocks(p) : await getText(p), at = { x: P[0] - 0.5, y: P[1] - 0.5, w: 1, h: 1 };
+  return list.findIndex(it => !it.field && !covered(p, it) && hitsRect(aabb(it), at));
+}
+let hoverTok = 0;
+async function hoverText(e, pid) { // Select mode: the line under the pointer is outlined and shows a text cursor, so it is clear that a click edits it
+  const pe = PE.get(pid); if (!pe) return;
+  const off = () => { if (pe.hov) { pe.hov.remove(); pe.hov = null; } pe.svg.classList.remove('txhover'); };
+  if (!e || S.tool !== 'select' || drag || S.editing || e.pointerType === 'touch' || e.target.closest('.overlay [data-id], [data-h]')) return off(); // (over something added: that moves instead)
+  const tok = ++hoverTok, p = pageById(pid), P = toPt(e, pe), i = await textItemAt(p, P); if (tok !== hoverTok) return;
+  if (i < 0) return off();
+  const it = (S.para ? await getBlocks(p) : await getText(p))[i], b = aabb(it);
+  if (!pe.hov) pe.hov = svg('rect', { class: 'tihover' }, pe.gUI);
+  for (const [k, v] of Object.entries({ x: b.x - 1.5, y: b.y - 1, width: b.w + 3, height: b.h + 2 })) pe.hov.setAttribute(k, v);
+  pe.svg.classList.add('txhover');
 }
 function toBlocks(lines) { // lines grouped into paragraphs for paragraph-mode editing
   const items = lines.filter(l => !l.rot).sort((a, b) => a.base - b.base || a.x - b.x), blocks = lines.filter(l => l.rot);
@@ -1139,6 +1205,8 @@ function syncControls() {
   $('#pRot').value = Math.round((ed || one || {}).rot || 0); $('.selonly-wrap').classList.toggle('off', !one || isLine(one));
   const src = ed || one;
   $('#props').dataset.ctx = src ? (src.type === 'text' ? 'text' : src.type === 'image' ? 'image' : 'shape') : s ? 'all' : ['text', 'edittext', 'note'].includes(S.tool) ? 'text' : 'shape';
+  // formatting is only offered when there is something to format (a selection, the text being typed, or a drawing tool); otherwise the row shows a tip
+  $('#props').classList.toggle('idle', !(src || s || ['text', 'note', 'pen', 'marker', 'hl', 'rect', 'ellipse', 'line', 'arrow'].includes(S.tool)));
 }
 const bindProp = (sel, k, get) => { const el = $(sel); el.addEventListener('input', () => setProp(k, get(el))); el.addEventListener('change', () => { armed = false; }); el.addEventListener('keydown', e => e.stopPropagation()); };
 bindProp('#pColor', 'color', el => el.value);
@@ -1258,21 +1326,24 @@ window.addEventListener('keydown', e => { // arrow keys / Enter / Esc inside an 
 }, true);
 
 const STAMPS = [['APPROVED', '#16a34a'], ['REJECTED', '#dc2626'], ['CONFIDENTIAL', '#dc2626'], ['DRAFT', '#64748b'], ['PAID', '#2563eb'], ['COPY', '#64748b'], ['SIGN HERE', '#d97706']];
-const TOOL_LIST = [['select', 'Select / move', 'cursor', 'V'], ['hand', 'Pan', 'hand'], ['edittext', 'Edit text', 'edittext', 'E'], ['editobj', 'Edit object', 'editobj', 'B'], ['text', 'Add text', 'text', 'T'], ['note', 'Sticky note', 'note', 'N'],
-  ['pen', 'Pen', 'pen', 'P'], ['marker', 'Highlighter', 'marker', 'M'], ['hl', 'Highlight area', 'hl', 'H'], ['rect', 'Rectangle', 'rect', 'R'], ['ellipse', 'Ellipse', 'ellipse', 'O'], ['line', 'Line', 'line', 'L'], ['arrow', 'Arrow', 'arrow', 'A'],
-  ['whiteout', 'Whiteout', 'eraser', 'W'], ['redact', 'Blackout', 'redact'], ['link', 'Link', 'link'], ['crop', 'Crop pages', 'crop']];
-const toolsSub = () => TOOL_LIST.map(([t, l, ic, key]) => mi(l, ic, 'tool', { d: { t }, key, checked: S.tool === t }));
+const TOOL_LIST = [['select', 'Select', 'cursor', 'V'], ['hand', 'Pan', 'hand'], '-', ['edittext', 'Edit text', 'edittext', 'E'], ['text', 'Add text', 'text', 'T'], ['editobj', 'Move content', 'editobj', 'B'], ['whiteout', 'Whiteout', 'eraser', 'W'], '-',
+  ['marker', 'Highlight pen', 'marker', 'M'], ['hl', 'Highlight box', 'hl', 'H'], ['pen', 'Pen', 'pen', 'P'], ['note', 'Sticky note', 'note', 'N'], '-',
+  ['rect', 'Rectangle', 'rect', 'R'], ['ellipse', 'Ellipse', 'ellipse', 'O'], ['line', 'Line', 'line', 'L'], ['arrow', 'Arrow', 'arrow', 'A'], '-',
+  ['link', 'Link', 'link'], ['crop', 'Crop', 'crop'], ['redact', 'Black out', 'redact']];
+const toolsSub = () => TOOL_LIST.map(x => x === '-' ? '-' : mi(x[1], x[2], 'tool', { d: { t: x[0] }, key: x[3], checked: S.tool === x[0] }));
 const insertSub = () => [mi('Image…', 'image', 'image'), mi('Signature…', 'sign', 'sign'), mi('Today’s date', 'cal', 'datestamp'),
   { label: 'Stamp', icon: 'stamp', sub: [...STAMPS.map(([t, c]) => mi(t[0] + t.slice(1).toLowerCase(), 'stamp', 'stamp', { d: { t, c } })), mi('Check mark', 'check', 'stamp', { d: { t: '✓', c: '#16a34a', plain: 1 } }), mi('Cross mark', 'x', 'stamp', { d: { t: '✗', c: '#dc2626', plain: 1 } })] },
   '-', mi('Watermark…', 'drop', 'watermark'), mi('Page numbers…', 'hash', 'pagenum'), mi('Header / footer…', 'stroke', 'headfoot'), '-',
   mi('Scan document…', 'scan', 'scan'), mi('Add files (PDF, Word, images)…', 'merge', 'merge'), mi('Blank page', 'plus', 'blank')];
 const pageSub = () => { const n = S.pages.length, p = S.pages[S.cur]; return [
-  mi('Rotate right', 'rotate', 'rotr'), mi('Rotate left', 'rotatel', 'rotl'), mi('Duplicate', 'copy', 'dup'), mi('Insert blank page after', 'plus', 'blank'), mi('Replace with another file…', 'swap', 'replacepage'), '-',
-  mi('Move up', 'up', 'pgup', { disabled: S.cur === 0, key: 'Ctrl+Shift+↑' }), mi('Move down', 'down', 'pgdown', { disabled: S.cur >= n - 1, key: 'Ctrl+Shift+↓' }), mi('Move to position…', 'swap', 'moveto', { disabled: n < 2 }), mi('Move to start', 'front', 'pgtop', { disabled: S.cur === 0 }), mi('Move to end', 'back', 'pgend', { disabled: S.cur >= n - 1 }), '-',
-  mi('Extract…', 'split', 'extract'), mi('Change size…', 'fit', 'resize'), mi('Add page numbers…', 'hash', 'pagenum'), mi('Bookmarks…', 'bookmark', 'bookmarks'), mi('Export as PNG', 'image', 'png'), '-',
-  p && p.crop && mi('Remove crop', 'crop', 'uncrop'), mi('Remove all edits on page', 'eraser', 'clearpage', { disabled: !p || !p.objs.length }), mi('Delete page', 'trash', 'delpage', { danger: 1, disabled: n < 2 })]; };
+  mi('Rotate right', 'rotate', 'rotr'), mi('Rotate left', 'rotatel', 'rotl'), mi('Duplicate', 'copy', 'dup'), mi('Insert blank page after', 'plus', 'blank'), '-',
+  { label: 'Move page', icon: 'swap', sub: [mi('Up', 'up', 'pgup', { disabled: S.cur === 0, key: 'Ctrl+Shift+↑' }), mi('Down', 'down', 'pgdown', { disabled: S.cur >= n - 1, key: 'Ctrl+Shift+↓' }), '-',
+    mi('To the start', 'front', 'pgtop', { disabled: S.cur === 0 }), mi('To the end', 'back', 'pgend', { disabled: S.cur >= n - 1 }), mi('To position…', 'swap', 'moveto', { disabled: n < 2 })] },
+  mi('Save this page as PDF…', 'split', 'extract'), mi('Export as PNG', 'image', 'png'), mi('Replace with another file…', 'swap', 'replacepage'), mi('Change page size…', 'fit', 'resize'), '-',
+  p && p.crop && mi('Remove crop', 'crop', 'uncrop'), mi('Remove all edits on this page', 'eraser', 'clearpage', { disabled: !p || !p.objs.length }), mi('Delete page', 'trash', 'delpage', { danger: 1, disabled: n < 2 })]; };
+const sbOn = () => (innerWidth > 980 ? !document.body.classList.contains('nosb') : document.body.classList.contains('sbopen'));
 const zoomSub = () => [mi('Zoom in', 'zoomin', 'zoomin', { key: 'Ctrl +' }), mi('Zoom out', 'zoomout', 'zoomout', { key: 'Ctrl −' }), mi('Actual size (100%)', '', 'zoomreset', { key: 'Ctrl+0' }), mi('Fit width', 'fit', 'fit'), mi('Fit whole page', 'pages', 'fitpage'), '-',
-  mi('Show / hide page panel', 'panel', 'sidebar'), mi('Light / dark theme', 'moon', 'theme')];
+  mi('Page thumbnails', 'panel', 'sidebar', { checked: sbOn() }), mi('Two pages side by side', 'spread', 'spread', { checked: document.body.classList.contains('spread') }), mi('Reading view', 'book', 'reader')];
 const convertSub = () => [mi('PDF → Word (.docx)…', 'word', 'pdf2docx'), mi('PDF → Images…', 'image', 'pdf2img'), mi('Export text (.txt)', 'text', 'exporttxt'), '-',
   mi('Compress…', 'compress', 'compress'), mi('Split into single pages', 'split', 'splitzip'), '-', mi('Make searchable (OCR)…', 'scan', 'ocrall'), mi('Compare with another PDF…', 'swap', 'compare'), mi('Batch process…', 'layers', 'batch'), '-', mi('Password protect…', 'lock', 'protect'), mi('Flatten (permanent redaction)…', 'layers', 'flatten')];
 const editItems = () => [mi('Undo', 'undo', 'undo', { key: 'Ctrl+Z', disabled: !S.undo.length }), mi('Redo', 'redo', 'redo', { key: 'Ctrl+Y', disabled: !S.redo.length })];
@@ -1283,13 +1354,16 @@ const textStyleSub = (o, keep) => [
   ...['left', 'center', 'right'].map(v => mi('Align ' + (v === 'center' ? 'centre' : v), 'align' + v, 'talign', { d: { v }, checked: (o.align || 'left') === v, keep })), '-',
   mi('Bigger', 'plus', 'tsize', { d: { v: 2 }, keep }), mi('Smaller', 'minus', 'tsize', { d: { v: -2 }, keep })];
 function pageMenu(here) {
-  return [mi('Paste', 'pages', here ? 'pastehere' : 'paste', { key: 'Ctrl+V', disabled: !S.clip }),
-    mi('Add text' + (here ? ' here' : ''), 'text', 'texthere'), mi('Add sticky note' + (here ? ' here' : ''), 'note', 'notehere'), { label: 'Insert', icon: 'plus', sub: insertSub() }, '-',
-    { label: 'Tools', icon: 'cursor', sub: toolsSub() }, mi('Select all on page', 'selall', 'selall', { key: 'Ctrl+A' }), mi('Find & replace…', 'search', 'findrep', { key: 'Ctrl+H' }), '-',
-    ...editItems(), '-',
-    { label: 'This page', icon: 'pages', sub: pageSub() }, mi('Organize pages…', 'grid', 'organize', { key: 'G' }), { label: 'Zoom & view', icon: 'zoomin', sub: zoomSub() }, { label: 'Convert & protect', icon: 'word', sub: convertSub() }, '-',
-    mi('Print…', 'print', 'print', { key: 'Ctrl+P' }), mi('Save PDF', 'download', 'save', { key: 'Ctrl+S' })];
+  const H = here ? ' here' : '';
+  return [mi('Add text' + H, 'text', 'texthere', { key: 'T' }), mi('Add sticky note' + H, 'note', 'notehere', { key: 'N' }),
+    mi('Insert image' + H + '…', 'image', 'imagehere'), mi('Add signature' + H + '…', 'sign', 'signhere'),
+    { label: 'Stamp' + H, icon: 'stamp', sub: stampSub() }, S.clip && mi('Paste' + H, 'pages', here ? 'pastehere' : 'paste', { key: 'Ctrl+V' }), '-',
+    mi('Undo', 'undo', 'undo', { key: 'Ctrl+Z', disabled: !S.undo.length }), mi('Redo', 'redo', 'redo', { key: 'Ctrl+Y', disabled: !S.redo.length }), '-',
+    mi('Select all on page', 'selall', 'selall', { key: 'Ctrl+A' }), mi('Find & replace…', 'search', 'findrep', { key: 'Ctrl+H' }), '-',
+    { label: 'This page', icon: 'pages', sub: pageSub() }, mi('Rearrange pages…', 'grid', 'organize', { key: 'G' }), { label: 'View', icon: 'zoomin', sub: zoomSub() }, { label: 'Switch tool', icon: 'cursor', sub: toolsSub() }, '-',
+    mi('Save PDF', 'download', 'save', { key: 'Ctrl+S' })];
 }
+const stampSub = () => [...STAMPS.map(([t, c]) => mi(t[0] + t.slice(1).toLowerCase(), 'stamp', 'stamphere', { d: { t, c } })), '-', mi('Check mark', 'check', 'stamphere', { d: { t: '✓', c: '#16a34a', plain: 1 } }), mi('Cross mark', 'x', 'stamphere', { d: { t: '✗', c: '#dc2626', plain: 1 } }), mi("Today's date", 'cal', 'datestamp')];
 function objectMenu(s) {
   const os = s.os, one = os.length === 1 ? os[0] : null, t = one && one.type, tx = os.find(o => o.type === 'text'), sh = os.find(o => o.type !== 'text' && o.type !== 'image');
   const op = Math.round(((one || os[0]).opacity ?? 1) * 100), A = (l, ic, m) => mi(l, ic, 'align', { d: { m } });
@@ -1297,35 +1371,35 @@ function objectMenu(s) {
     t === 'text' && mi('Edit text', 'edittext', 'edittxt', { key: 'Enter' }),
     t === 'image' && mi('Edit image (filters, crop)…', 'sliders', 'imgedit'), t === 'image' && mi('Remove background…', 'wand', 'bgremove'),
     t === 'image' && mi('Replace image…', 'swap', 'imgreplace'), t === 'image' && mi('Save image as…', 'download', 'imgsave'), (t === 'text' || t === 'image') && '-',
-    mi('Cut', 'cut', 'cut', { key: 'Ctrl+X' }), mi('Copy', 'copy', 'copy', { key: 'Ctrl+C' }), mi('Paste', 'pages', 'paste', { key: 'Ctrl+V', disabled: !S.clip }), mi('Duplicate', 'copy', 'osdup', { key: 'Ctrl+D' }),
-    mi('Delete', 'trash', 'del', { key: 'Del', danger: 1 }), '-',
+    mi('Cut', 'cut', 'cut', { key: 'Ctrl+X' }), mi('Copy', 'copy', 'copy', { key: 'Ctrl+C' }), S.clip && mi('Paste', 'pages', 'paste', { key: 'Ctrl+V' }), mi('Duplicate', 'copy', 'osdup', { key: 'Ctrl+D' }), '-',
     tx && { label: 'Text style', icon: 'text', sub: textStyleSub(tx) },
     sh && { label: 'Line style', icon: 'stroke', sub: [['solid', 'Solid'], ['dash', 'Dashed'], ['dot', 'Dotted']].map(([v, l]) => mi(l, '', 'sdash', { d: { v }, checked: (sh.dash || 'solid') === v })) },
     { label: 'Opacity', icon: 'drop', sub: [100, 75, 50, 25].map(v => mi(v + '%', '', 'opac', { d: { v: v / 100 }, checked: op === v })) },
     os.some(o => !isLine(o)) && { label: 'Rotate', icon: 'rotate', sub: [mi('90° right', 'rotate', 'orot', { d: { v: 90 } }), mi('90° left', 'rotatel', 'orot', { d: { v: -90 } }), mi('180°', '', 'orot', { d: { v: 180 } }), mi('Reset rotation', '', 'orot', { d: { v: 0 } })] },
-    { label: 'Arrange', icon: 'layers', sub: [mi('Bring to front', 'front', 'front'), mi('Bring forward', 'up', 'fwd'), mi('Send backward', 'down', 'bwd'), mi('Send to back', 'back', 'back')] },
-    { label: one ? 'Align on page' : 'Align', icon: 'al_c', sub: [A('Left', 'al_l', 'l'), A('Centre', 'al_c', 'c'), A('Right', 'al_r', 'r'), A('Top', 'al_t', 't'), A('Middle', 'al_m', 'm'), A('Bottom', 'al_b', 'b'), '-',
+    { label: 'Arrange & align', icon: 'layers', sub: [mi('Bring to front', 'front', 'front'), mi('Bring forward', 'up', 'fwd'), mi('Send backward', 'down', 'bwd'), mi('Send to back', 'back', 'back'), '-',
+      A(one ? 'Align left on page' : 'Align left', 'al_l', 'l'), A('Centre', 'al_c', 'c'), A('Align right', 'al_r', 'r'), A('Align top', 'al_t', 't'), A('Middle', 'al_m', 'm'), A('Align bottom', 'al_b', 'b'), '-',
       mi('Distribute horizontally', 'dist_h', 'distribute', { d: { m: 'h' }, disabled: os.length < 3 }), mi('Distribute vertically', 'dist_v', 'distribute', { d: { m: 'v' }, disabled: os.length < 3 })] }, '-',
-    mi('Copy style', 'brush', 'copystyle', { disabled: !one }), mi('Paste style', 'brush', 'pastestyle', { disabled: !S.styleClip }),
+    mi('Copy style', 'brush', 'copystyle', { disabled: !one }), S.styleClip && mi('Paste style', 'brush', 'pastestyle'),
     S.pages.length > 1 && mi('Copy to all pages', 'pages', 'toallpages'), '-',
-    mi('Select all on page', 'selall', 'selall', { key: 'Ctrl+A' }),
+    mi(os.length > 1 ? `Delete ${os.length} items` : 'Delete', 'trash', 'del', { key: 'Del', danger: 1 }),
   ];
 }
 const appMenu = () => S.pages.length ? [
   mi('Open…', 'folder', 'open', { key: 'Ctrl+O' }), mi('Add files…', 'merge', 'merge'), mi('Save PDF', 'download', 'save', { key: 'Ctrl+S' }), mi('Print…', 'print', 'print', { key: 'Ctrl+P' }), '-', ...editItems(), '-',
-  { label: 'Insert', icon: 'plus', sub: insertSub() }, { label: 'Tools', icon: 'cursor', sub: toolsSub() }, { label: 'This page', icon: 'pages', sub: pageSub() }, mi('Organize pages…', 'grid', 'organize', { key: 'G' }),
+  { label: 'Insert', icon: 'plus', sub: insertSub() }, { label: 'Tools', icon: 'cursor', sub: toolsSub() }, { label: 'This page', icon: 'pages', sub: pageSub() }, mi('Rearrange pages…', 'grid', 'organize', { key: 'G' }),
   { label: 'Zoom & view', icon: 'zoomin', sub: zoomSub() }, { label: 'Convert & protect', icon: 'word', sub: convertSub() }, '-',
-  mi('Writing tools (spelling, grammar, humanize)…', 'spell', 'writer'), mi('Word editor (.docx)…', 'word', 'dx'), mi('Reading mode', 'book', 'reader', { checked: document.body.classList.contains('reader') }), mi('Two pages side by side', 'spread', 'spread', { checked: document.body.classList.contains('spread') }), mi('Night colours', 'moon', 'night', { checked: document.body.classList.contains('night') }), mi('Full screen', 'expand', 'fullscreen'), '-',
+  mi('Writing tools (spelling, grammar, humanize)…', 'spell', 'writer'), mi('Word editor (.docx)…', 'word', 'dx'), mi('Reading view', 'book', 'reader', { checked: document.body.classList.contains('reader') }), mi('Two pages side by side', 'spread', 'spread', { checked: document.body.classList.contains('spread') }), mi('Night colours', 'moon', 'night', { checked: document.body.classList.contains('night') }), mi('Full screen', 'expand', 'fullscreen'), '-',
   mi('Document properties…', 'info', 'props'), window.xd3desk && mi('Default PDF app…', 'windows', 'defapp'), mi('Keyboard shortcuts', 'key', 'shortcuts'), mi('About', 'info', 'about'),
 ] : [
   mi('Open file…', 'folder', 'open', { key: 'Ctrl+O' }), mi('View a PDF…', 'eye', 'viewpdf'), mi('Word editor (.docx)…', 'word', 'dx'), mi('Writing tools…', 'spell', 'writer'), mi('Merge files…', 'merge', 'mergedlg'), /^https?:$/.test(location.protocol) && mi('Download for Windows…', 'windows', 'dlwin'), window.xd3desk && mi('Default PDF app…', 'windows', 'defapp'), mi('Scan document…', 'scan', 'scan'), mi('Word → PDF…', 'word', 'docx2pdf'), mi('New blank PDF', 'plus', 'newdoc'),
   !$('#bRestore').hidden && mi('Restore last session', 'undo', 'restore'), '-', mi('Light / dark theme', 'moon', 'theme'), mi('Keyboard shortcuts', 'key', 'shortcuts'), mi('About', 'info', 'about'),
 ];
-function onContext(e, pid) { // right-click on a page: the object under the pointer, or the page itself
+async function onContext(e, pid) { // right-click on a page: the document's text, the object under the pointer, or the page itself
   commitEdit();
-  const ti = S.tool === 'edittext' && e.target.closest('[data-ti]');
-  if (ti) { S.ctxTI = { pid, i: +ti.dataset.ti }; return showCtx(e, [mi('Edit this text', 'edittext', 'ti_edit'), mi('Copy this text', 'copy', 'ti_copy'), '-', mi('Delete this text', 'trash', 'ti_del', { danger: 1 })]); }
+  const ti = S.tool === 'edittext' && e.target.closest('[data-ti]'), textMenu = () => showCtx(e, [mi('Edit this text', 'edittext', 'ti_edit'), mi('Copy this text', 'copy', 'ti_copy'), '-', mi('Highlight this text', 'hl', 'ti_mark', { d: { k: 'hl' } }), mi('Black out this text', 'redact', 'ti_mark', { d: { k: 'redact' } }), mi('Cover with white', 'eraser', 'ti_mark', { d: { k: 'whiteout' } }), '-', mi('Delete this text', 'trash', 'ti_del', { danger: 1 })]);
+  if (ti) { S.ctxTI = { pid, i: +ti.dataset.ti }; return textMenu(); }
   const p = pageById(pid), oe = e.target.closest('[data-id]'), hit = oe && p.objs.find(x => x.id === oe.dataset.id);
+  if (!hit && S.tool === 'select') { const i = await textItemAt(p, toPt(e, PE.get(pid))); if (i >= 0) { S.ctxTI = { pid, i }; return textMenu(); } }
   if (hit) { if (S.tool !== 'select') setTool('select'); if (!(S.sel && S.sel.pid === pid && S.sel.ids.includes(hit.id))) select(pid, hit.id); }
   else select(null);
   S.cur = S.pages.indexOf(p); S.ctxPt = { pid, P: toPt(e, PE.get(pid)) };
@@ -1341,7 +1415,7 @@ document.addEventListener('contextmenu', e => { // our own menu everywhere — t
   const pg = t.closest('.page'); if (pg) return onContext(e, pg.dataset.id);
   commitEdit(); S.ctxPt = null;
   const th = t.closest('.thumb');
-  if (th) { goToPage(S.pages.findIndex(p => p.id === th.dataset.id)); return showCtx(e, [...pageSub(), '-', mi('Organize pages…', 'grid', 'organize', { key: 'G' })]); }
+  if (th) { goToPage(S.pages.findIndex(p => p.id === th.dataset.id)); return showCtx(e, [...pageSub(), '-', mi('Rearrange pages…', 'grid', 'organize', { key: 'G' })]); }
   showCtx(e, t.closest('#viewer') && S.pages.length ? pageMenu(false) : appMenu());
 });
 
@@ -1392,7 +1466,8 @@ function viewCenter(p) {
   return [clamp(c.x, 0, p.w), clamp(c.y, 0, p.h)];
 }
 function placeObj(o, w, h) { // centre a new object in the visible part of the current page and select it
-  const p = S.pages[S.cur]; if (!p) return; pushUndo(); const c = viewCenter(p);
+  const at = S.placeAt && Date.now() - S.placeAt.t < 120000 ? S.placeAt : null; S.placeAt = null;
+  const p = (at && pageById(at.pid)) || S.pages[S.cur]; if (!p) return; pushUndo(); const c = at && at.pid === p.id ? at.P : viewCenter(p);
   o.x = clamp(c[0] - w / 2, 0, Math.max(0, p.w - w)); o.y = clamp(c[1] - h / 2, 0, Math.max(0, p.h - h));
   p.objs.push(o); drawObjs(p); setTool('select'); select(p.id, o.id);
 }
@@ -1869,9 +1944,9 @@ const ACT = {
   toallpages: toAllPages, imgreplace: imgReplace, imgsave: imgSave,
   ed_cut: () => document.execCommand('cut'), ed_copy: () => document.execCommand('copy'), ed_paste: edPaste, ed_selall: () => document.execCommand('selectAll'), ed_done: () => commitEdit(),
   ti_edit: () => { const c = S.ctxTI, p = c && pageById(c.pid); if (p) convertTextItem(p, c.i); },
-  ti_copy: () => { const c = S.ctxTI, pe = c && PE.get(c.pid), it = pe && pe.items && pe.items[c.i]; if (it) (navigator.clipboard ? navigator.clipboard.writeText(it.str) : Promise.reject()).then(() => toast('Copied'), () => toast('Copy is not available here')); },
+  ti_copy: async () => { const it = await ctxItem(); if (it) (navigator.clipboard ? navigator.clipboard.writeText(it.str) : Promise.reject()).then(() => toast('Copied'), () => toast('Copy is not available here')); },
   ti_del: async () => { // the line is taken out of the page (on save, out of the file itself)
-    const c = S.ctxTI, p = c && pageById(c.pid), pe = c && PE.get(c.pid), it = pe && pe.items && pe.items[c.i]; if (!it) return;
+    const c = S.ctxTI, p = c && pageById(c.pid), it = await ctxItem(); if (!it) return;
     const before = snap(), o = await editOriginal(p, it); p.objs = p.objs.filter(x => x !== o); pushUndo(before); drawObjs(p); drawTI(p); toast('Text deleted (Ctrl+Z to undo)');
   },
   redactall: () => { // black out every match of the search
@@ -1890,12 +1965,19 @@ const ACT = {
   del: delSel, osdup: dupSel, copy: copySel, cut: () => { copySel(); delSel(); }, paste: () => pasteClip(), pastehere: () => pasteClip(S.ctxPt), front: () => reorder(true), back: () => reorder(false),
   align: b => alignSel(b.dataset.m), distribute: b => distributeSel(b.dataset.m), copystyle: copyStyle, pastestyle: pasteStyle,
   texthere: () => newTextAt(false), notehere: () => newTextAt(true), tool: b => setTool(b.dataset.t),
+  imagehere: () => { S.placeAt = S.ctxPt && { ...S.ctxPt, t: Date.now() }; ACT.image(); }, signhere: () => { S.placeAt = S.ctxPt && { ...S.ctxPt, t: Date.now() }; ACT.sign(); },
+  stamphere: b => { S.placeAt = S.ctxPt && { ...S.ctxPt, t: Date.now() }; ACT.stamp(b); },
+  ti_mark: async b => { // highlight / black out / white out exactly the line that was right-clicked
+    const c = S.ctxTI, p = c && pageById(c.pid), it = await ctxItem(); if (!it) return; const r = aabb(it), k = b.dataset.k;
+    pushUndo(); const o = { id: uid(), ...NEW[k]([r.x - 1, r.y], S.style), w: r.w + 2, h: r.h }; p.objs.push(o); drawObjs(p); if (S.tool === 'edittext') drawTI(p);
+    toast(k === 'hl' ? 'Highlighted' : k === 'redact' ? 'Blacked out — removed for good when you save' : 'Covered with white');
+  },
   pgup: () => { if (S.cur > 0) { movePage(S.cur, S.cur - 1); goToPage(S.cur - 1); } }, pgdown: () => { if (S.cur < S.pages.length - 1) { movePage(S.cur, S.cur + 1); goToPage(S.cur + 1); } }, moveto: () => movePageDlg(),
   findrep: () => { toggleFind(true); $('#replInput').focus(); }, repl1: replaceOne, replall: replaceAll, docx2pdf: () => $('#fDocx').click(),
   edittxt: () => { const s = selOne(); if (s && s.o.type === 'text') startEdit(s.p, s.o, snap()); },
   shortcuts: () => dialog('Keyboard shortcuts', `<div class="keys">${[
-    ['Ctrl+O / Ctrl+S / Ctrl+P', 'Open · Save · Print'], ['Ctrl+Z / Ctrl+Y', 'Undo / redo'], ['Ctrl+F / Ctrl+H', 'Find · Find & replace'], ['G', 'Organize pages'], ['Ctrl+X', 'Cut selection'],
-    ['Ctrl+Shift+↑ / ↓', 'Move the current page up / down'], ['Ctrl + / −  ·  Ctrl+wheel', 'Zoom'], ['V E B T', 'Select · Edit text (also in scans and pictures) · Edit object · Add text'], ['P M H N', 'Pen · Highlighter · Highlight area · Note'],
+    ['Ctrl+O / Ctrl+S / Ctrl+P', 'Open · Save · Print'], ['Ctrl+Z / Ctrl+Y', 'Undo / redo'], ['Ctrl+F / Ctrl+H', 'Find · Find & replace'], ['G', 'Rearrange pages'], ['Ctrl+X', 'Cut selection'],
+    ['Ctrl+Shift+↑ / ↓', 'Move the current page up / down'], ['Ctrl + / −  ·  Ctrl+wheel', 'Zoom'], ['V E B T', 'Select · Edit text (also in scans and pictures) · Move content · Add text'], ['P M H N', 'Pen · Highlighter · Highlight area · Note'],
     ['R O L A W', 'Rectangle · Ellipse · Line · Arrow · Whiteout'], ['Del', 'Delete selection'], ['Ctrl+A', 'Select everything on the page'], ['Ctrl+D', 'Duplicate selection'],
     ['Ctrl+C / Ctrl+V', 'Copy / paste objects (or paste an image)'], ['Ctrl+B / I / U', 'Bold · italic · underline'], ['Arrows', 'Nudge selection (Shift = ×10)'],
     ['Esc', 'Leave reading mode · deselect'], ['← → Home End', 'Change page (reading mode)'], ['Shift+drag', 'Square / 45° lines / 15° rotation / free image resize'], ['Shift+click', 'Add to selection'], ['Double‑click', 'Edit a text box, or open the image editor'], ['Right‑click', 'Menu for the object, page or thumbnail'],

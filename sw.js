@@ -1,7 +1,7 @@
 /* XD3 PDF Editor — service worker: after the first visit the editor keeps working with no connection, and it can be installed like an app. */
-const VERSION = 'xd3-pdf-editor-v9'; // (raise on every release: it replaces the cached libraries and fonts)
-const CORE = ['./', 'index.html', 'manifest.webmanifest', 'css/style.css', 'js/app.js', 'js/native.js', 'js/ocr.js', 'js/insert.js', 'js/imaging.js', 'js/convert.js', 'js/forms.js', 'js/extras.js', 'js/reader.js', 'js/writing.js', 'js/download.js', 'js/desktop.js', 'js/docx.js', 'js/organize.js', 'js/secure.js', 'js/ui.js', 'js/bundle.js',
-  'lib/pdf.min.js', 'lib/pdf.worker.min.js', 'lib/pdf-lib.min.js', 'lib/fontkit.umd.min.js', 'lib/jszip.min.js', 'icons/icon-192.png', 'icons/icon-512.png'];
+const VERSION = 'xd3-pdf-editor-v13'; // (raise on every release: it replaces the cached libraries and fonts)
+const CORE = ['./', 'index.html', 'manifest.webmanifest', 'css/style.css', 'js/app.js', 'js/native.js', 'js/ocr.js', 'js/insert.js', 'js/imaging.js', 'js/convert.js', 'js/home.js', 'js/forms.js', 'js/extras.js', 'js/reader.js', 'js/writing.js', 'js/download.js', 'js/desktop.js', 'js/docx.js', 'js/organize.js', 'js/secure.js', 'js/ui.js', 'js/bundle.js',
+  'lib/pdf.min.js', 'lib/pdf.worker.min.js', 'lib/pdf-lib.min.js', 'lib/fontkit.umd.min.js', 'lib/jszip.min.js', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/logo.svg', 'icons/logo-small.svg', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => Promise.all(CORE.map(u => c.add(u).catch(() => { /* a file that this build does not have */ })))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

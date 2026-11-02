@@ -81,4 +81,44 @@ pal.addEventListener('mousedown', e => { if (e.target === pal) closePal(); });
 window.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && !document.body.classList.contains('dxopen')) { e.preventDefault(); e.stopImmediatePropagation(); if (pal.hidden) { if (!$('#dlg').open) openPal(); } else closePal(); }
 }, true);
+
+/* ───────── guidance: the tip for the current tool sits in the toolbar (where people look), not only in the status bar ───────── */
+const hint = $('#hint'), ctxhint = $('#ctxhint'), copyHint = () => { ctxhint.textContent = hint.textContent; ctxhint.title = hint.textContent; };
+new MutationObserver(copyHint).observe(hint, { childList: true, characterData: true, subtree: true }); copyHint();
+// the toolbar rows never wrap: when they are wider than the window, the mouse wheel scrolls them sideways
+for (const row of $$('.tools, #props')) row.addEventListener('wheel', e => { if (row.scrollWidth > row.clientWidth + 2 && Math.abs(e.deltaY) > Math.abs(e.deltaX)) { row.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
+
+/* ───────── touch screens: press and hold a button to see what it does ───────── */
+let holdT = 0, tip = null;
+const hideTip = () => { clearTimeout(holdT); if (tip) { tip.remove(); tip = null; } };
+document.addEventListener('touchstart', e => {
+  hideTip(); const b = e.target.closest && e.target.closest('button[title], [data-tool][title]'); if (!b) return;
+  holdT = setTimeout(() => {
+    const r = b.getBoundingClientRect(); tip = document.createElement('div'); tip.className = 'holdtip'; tip.textContent = b.title.replace(/\s*\([^()]{1,12}\)\s*/, ' ').trim(); document.body.appendChild(tip);
+    tip.style.left = Math.max(8, Math.min(innerWidth - tip.offsetWidth - 8, r.left + r.width / 2 - tip.offsetWidth / 2)) + 'px'; tip.style.top = (r.bottom + 8 + tip.offsetHeight > innerHeight ? r.top - tip.offsetHeight - 8 : r.bottom + 8) + 'px';
+    setTimeout(hideTip, 2600);
+  }, 450);
+}, { passive: true });
+document.addEventListener('touchmove', () => clearTimeout(holdT), { passive: true });
+document.addEventListener('touchend', () => clearTimeout(holdT), { passive: true });
+
+/* ───────── first time a PDF is opened: three short tips ───────── */
+const SEEN = 'xd3.tips1', seen = () => { try { return localStorage.getItem(SEEN) === '1'; } catch (e) { return true; } };
+function firstTips(force) {
+  if ((!force && seen()) || $('#coach') || /selftest/.test(location.search)) return;
+  const c = document.createElement('div'); c.id = 'coach'; c.setAttribute('role', 'dialog'); c.setAttribute('aria-label', 'Quick tips');
+  c.innerHTML = `<b>Quick tips</b><ol><li><b>Click any text</b> to change it — it keeps its own font.</li><li>Use the tabs <b>Annotate, Insert, Pages, Convert, Protect</b> for everything else.</li><li>Click <b>Save PDF</b> when you are done — your file never leaves this device.</li></ol><button class="btn primary" type="button">Got it</button>`;
+  document.body.appendChild(c);
+  $('button', c).onclick = () => { try { localStorage.setItem(SEEN, '1'); } catch (e) { /* shown again next time */ } c.remove(); };
+}
+document.addEventListener('xd3:opened', () => setTimeout(firstTips, 600));
+X.ACT.tips = () => firstTips(true); X.NO_DOC.add('tips');
+
+/* ───────── More menu: each switch shows whether its option is on, every time the menu opens ───────── */
+const more = $('#mMore'), body = document.body;
+const TOG = { sidebar: () => (innerWidth > 980 ? !body.classList.contains('nosb') : body.classList.contains('sbopen')), spread: () => body.classList.contains('spread'), night: () => body.classList.contains('night'),
+  fullscreen: () => !!document.fullscreenElement, annots: () => { try { return localStorage.getItem('xd3.annots') !== 'off'; } catch (e) { return true; } } };
+const syncTog = () => $$('[data-tog]', more).forEach(b => b.classList.toggle('on', TOG[b.dataset.tog]()));
+new MutationObserver(() => { if (more.classList.contains('open')) syncTog(); }).observe(more, { attributes: true, attributeFilter: ['class'] });
+more.addEventListener('click', e => { if (e.target.closest('[data-tog]')) { setTimeout(() => { more.classList.add('open'); syncTog(); }, 0); setTimeout(syncTog, 350); } }); // a switch flips in place: the menu stays open
 })();

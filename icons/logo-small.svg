@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- XD3 PDF Editor icon for 16–32 px (browser tab, small Windows icons): bolder shapes, no text lines. Big sizes use logo.svg. -->
+  <defs>
+    <linearGradient id="sbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
+    <linearGradient id="sred" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fb7185"/><stop offset="1" stop-color="#e11d48"/></linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#sbg)"/>
+  <path d="M19 5h20l14 14v36a5 5 0 0 1-5 5H19a5 5 0 0 1-5-5V10a5 5 0 0 1 5-5z" fill="#fff"/>
+  <path d="M39 5v10a4 4 0 0 0 4 4h10z" fill="#d7def0"/>
+  <rect x="4" y="29" width="51" height="25" rx="6" fill="url(#sred)"/>
+  <path d="M10.5 48.5v-14h5.5a4 4 0 0 1 0 8h-5.5M24.5 34.5v14h3.3a7 7 0 0 0 0-14zM47.5 34.5h-7v14M40.5 41.5h6" fill="none" stroke="#fff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

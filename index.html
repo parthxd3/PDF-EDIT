@@ -7,7 +7,9 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' blob: 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:; worker-src 'self' blob:; frame-src blob:; media-src 'self' blob: mediastream:; object-src 'none'; base-uri 'none'">
 <title>XD3 PDF Editor — Free PDF Editor by XD3Labs</title>
 <meta name="description" content="Free, fast, private, offline PDF editor by XD3Labs / XDCybertech Pvt Ltd. Edit text and objects, scan, convert Word, compress, protect, annotate, sign, merge and split PDFs entirely on your device.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%236d5efc'/%3E%3Cpath d='M9 9l14 14M23 9L9 23' stroke='%23fff' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="icons/logo-small.svg">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="css/style.css">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0e1016">
@@ -16,20 +18,19 @@
 
 <header id="topbar">
   <div class="brand" data-act="about" title="About">
-    <svg class="logo" viewBox="0 0 32 32"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M9 9l14 14M23 9L9 23" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/></svg>
+    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#22d3ee"/></linearGradient><linearGradient id="lgRed" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fb7185"/><stop offset="1" stop-color="#e11d48"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#lg)"/><path d="M19 5h20l14 14v36a5 5 0 0 1-5 5H19a5 5 0 0 1-5-5V10a5 5 0 0 1 5-5z" fill="#fff"/><path d="M39 5v10a4 4 0 0 0 4 4h10z" fill="#d7def0"/><rect x="4" y="29" width="51" height="25" rx="6" fill="url(#lgRed)"/><path d="M10.5 48.5v-14h5.5a4 4 0 0 1 0 8h-5.5M24.5 34.5v14h3.3a7 7 0 0 0 0-14zM47.5 34.5h-7v14M40.5 41.5h6" fill="none" stroke="#fff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     <div class="brandtxt"><b>XD3 PDF Editor</b><small>by XD3Labs · XDCybertech Pvt Ltd</small></div>
   </div>
   <div class="grp">
-    <button class="btn" data-act="open" title="Open PDF, Word (.docx) or images (Ctrl+O)"><i data-icon="folder"></i><span>Open</span></button>
-    <button class="btn" data-act="merge" title="Add more files to this document — PDF, Word or images"><i data-icon="merge"></i><span>Add files</span></button>
-    <button class="btn primary" data-act="save" title="Download edited PDF (Ctrl+S)"><i data-icon="download"></i><span>Save PDF</span></button>
-    <button class="btn ico" data-act="print" title="Print (Ctrl+P)"><i data-icon="print"></i></button>
+    <button class="btn" data-act="open" title="Open a PDF, Word file or images (Ctrl+O)"><i data-icon="folder"></i><span>Open</span></button>
+    <button class="btn primary needdoc" data-act="save" title="Save your edited PDF (Ctrl+S)"><i data-icon="download"></i><span>Save PDF</span></button>
+    <button class="btn ico needdoc" data-act="print" title="Print (Ctrl+P)"><i data-icon="print"></i></button>
   </div>
-  <div class="grp">
+  <div class="grp needdoc">
     <button class="btn ico" data-act="undo" id="bUndo" title="Undo (Ctrl+Z)"><i data-icon="undo"></i></button>
     <button class="btn ico" data-act="redo" id="bRedo" title="Redo (Ctrl+Y)"><i data-icon="redo"></i></button>
   </div>
-  <nav id="tabs">
+  <nav id="tabs" class="needdoc">
     <button class="tab active" data-tab="edit">Edit</button>
     <button class="tab" data-tab="annotate">Annotate</button>
     <button class="tab" data-tab="insert">Insert</button>
@@ -40,55 +41,51 @@
   <div class="spacer"></div>
   <span id="fileName"></span>
   <button class="btn cmdk" data-act="palette" title="Search every command (Ctrl+K)"><i data-icon="bolt"></i><span>Search commands</span><kbd>Ctrl K</kbd></button>
-  <button class="btn" data-act="writer" title="Writing tools — spelling, grammar, humanize, readability (Word, text or this PDF)"><i data-icon="spell"></i><span>Write</span></button>
-  <button class="btn" data-act="reader" title="Reading mode — a clean viewer with selectable text, links and bookmarks (Esc to return)"><i data-icon="book"></i><span>Read</span></button>
+  <button class="btn needdoc" data-act="reader" title="Reading view — a clean viewer with selectable text, links and bookmarks (Esc to return)"><i data-icon="book"></i><span>Reading view</span></button>
   <button class="btn ico readonly" data-act="spread" title="Two pages side by side"><i data-icon="spread"></i></button>
   <button class="btn ico readonly" data-act="night" title="Night colours"><i data-icon="moon"></i></button>
   <button class="btn ico readonly" data-act="fullscreen" title="Full screen"><i data-icon="expand"></i></button>
-  <button class="btn ico" data-act="find" title="Find (Ctrl+F)"><i data-icon="search"></i></button>
+  <button class="btn ico needdoc" data-act="find" title="Find (Ctrl+F)"><i data-icon="search"></i></button>
   <button class="btn ico" id="bBell" data-menu="mNotes" title="Notifications"><i data-icon="bell"></i><b class="badge" hidden></b></button>
-  <button class="btn ico" data-act="sidebar" title="Toggle page panel"><i data-icon="panel"></i></button>
-  <button class="btn ico" data-menu="mMore" title="More: appearance, properties, help"><i data-icon="more"></i></button>
+  <button class="btn ico" data-menu="mMore" title="More: view, appearance, help"><i data-icon="more"></i></button>
 </header>
 
 <div id="toolbar">
   <div class="tools">
-    <button class="tool active" data-tool="select" title="Select, move, resize, rotate (V)"><i data-icon="cursor"></i></button>
-    <button class="tool" data-tool="hand" title="Pan"><i data-icon="hand"></i></button>
+    <button class="tool active" data-tool="select" data-label="Select" title="Select (V) — click text to change it; click something you added to move, resize or rotate it"><i data-icon="cursor"></i></button>
+    <button class="tool" data-tool="hand" data-label="Pan" title="Pan — drag to move around the page"><i data-icon="hand"></i></button>
     <span class="sep"></span>
 
     <div class="pane active" data-pane="edit">
-      <button class="tool wide" data-tool="edittext" title="Edit existing text (E) — click any text line"><i data-icon="edittext"></i><span>Edit text</span></button>
-      <button class="tool wide" data-tool="editobj" title="Edit objects (B) — click an image, or drag a box around anything to move / resize / delete it"><i data-icon="editobj"></i><span>Edit object</span></button>
-      <button class="tool wide" data-tool="text" title="Add text (T)"><i data-icon="text"></i><span>Add text</span></button>
+      <button class="tool wide" data-tool="edittext" title="Edit text (E) — every line of the document is outlined; click one to change it. In Select mode a click on text works too"><i data-icon="edittext"></i><span>Edit text</span></button>
+      <button class="tool wide" data-tool="text" title="Add new text anywhere on the page (T)"><i data-icon="text"></i><span>Add text</span></button>
+      <button class="tool wide" data-tool="editobj" title="Move content (B) — move, resize or delete pictures and other parts of the original page: click a picture, or drag a box around anything"><i data-icon="editobj"></i><span>Move content</span></button>
+      <button class="tool wide" data-tool="whiteout" title="Whiteout (W) — drag a box to cover content with white"><i data-icon="eraser"></i><span>Whiteout</span></button>
       <span class="sep"></span>
       <button class="tool wide" data-act="findrep" title="Find &amp; replace (Ctrl+H)"><i data-icon="search"></i><span>Find &amp; replace</span></button>
-      <button class="tool wide" data-act="selall" title="Select everything on this page (Ctrl+A)"><i data-icon="selall"></i><span>Select all</span></button>
+      <button class="tool wide" data-act="writer" title="Check spelling and grammar, or humanize the wording of this PDF"><i data-icon="spell"></i><span>Spelling &amp; grammar</span></button>
     </div>
 
     <div class="pane" data-pane="annotate">
-      <button class="tool wide" data-tool="pen" title="Pen (P)"><i data-icon="pen"></i><span>Pen</span></button>
-      <button class="tool wide" data-tool="marker" title="Highlighter pen (M)"><i data-icon="marker"></i><span>Highlighter</span></button>
-      <button class="tool wide" data-tool="hl" title="Highlight area (H)"><i data-icon="hl"></i><span>Highlight area</span></button>
+      <button class="tool wide" data-tool="marker" title="Highlight pen (M) — drag over text to highlight it freehand"><i data-icon="marker"></i><span>Highlight pen</span></button>
+      <button class="tool wide" data-tool="hl" title="Highlight box (H) — drag a box to highlight an area"><i data-icon="hl"></i><span>Highlight box</span></button>
+      <button class="tool wide" data-tool="pen" title="Pen (P) — draw freehand"><i data-icon="pen"></i><span>Pen</span></button>
       <button class="tool wide" data-tool="note" title="Sticky note (N)"><i data-icon="note"></i><span>Note</span></button>
       <span class="sep"></span>
-      <button class="tool" data-tool="rect" title="Rectangle (R)"><i data-icon="rect"></i></button>
-      <button class="tool" data-tool="ellipse" title="Ellipse (O)"><i data-icon="ellipse"></i></button>
-      <button class="tool" data-tool="line" title="Line (L)"><i data-icon="line"></i></button>
-      <button class="tool" data-tool="arrow" title="Arrow (A)"><i data-icon="arrow"></i></button>
-      <span class="sep"></span>
-      <button class="tool wide" data-tool="whiteout" title="Whiteout — cover content with white (W)"><i data-icon="eraser"></i><span>Whiteout</span></button>
-      <button class="tool wide" data-tool="redact" title="Blackout box — covers content; use Protect ▸ Flatten to remove it for good"><i data-icon="redact"></i><span>Blackout</span></button>
+      <button class="tool" data-tool="rect" data-label="Box" title="Rectangle (R)"><i data-icon="rect"></i></button>
+      <button class="tool" data-tool="ellipse" data-label="Circle" title="Ellipse (O)"><i data-icon="ellipse"></i></button>
+      <button class="tool" data-tool="line" data-label="Line" title="Line (L)"><i data-icon="line"></i></button>
+      <button class="tool" data-tool="arrow" data-label="Arrow" title="Arrow (A)"><i data-icon="arrow"></i></button>
     </div>
 
     <div class="pane" data-pane="insert">
       <button class="tool wide" data-act="image" title="Insert an image"><i data-icon="image"></i><span>Image</span></button>
       <button class="tool wide" data-act="sign" title="Draw or type a signature"><i data-icon="sign"></i><span>Signature</span></button>
       <button class="tool wide" data-menu="mStamps" title="Stamps"><i data-icon="stamp"></i><span>Stamp ▾</span></button>
-      <button class="tool wide" data-act="datestamp" title="Insert today's date"><i data-icon="cal"></i><span>Date</span></button>
+      <button class="tool wide" data-act="datestamp" title="Insert the date of today"><i data-icon="cal"></i><span>Date</span></button>
       <span class="sep"></span>
       <button class="tool wide" data-act="watermark" title="Watermark"><i data-icon="drop"></i><span>Watermark</span></button>
-      <button class="tool wide" data-act="pagenum" title="Page numbers"><i data-icon="hash"></i><span>Page numbers</span></button>
+      <button class="tool wide" data-act="pagenum" title="Add page numbers"><i data-icon="hash"></i><span>Page numbers</span></button>
       <button class="tool wide" data-act="headfoot" title="Header / footer"><i data-icon="stroke"></i><span>Header / footer</span></button>
       <button class="tool wide" data-tool="link" title="Add a link to a website or another page"><i data-icon="link"></i><span>Link</span></button>
       <span class="sep"></span>
@@ -96,55 +93,50 @@
     </div>
 
     <div class="pane" data-pane="pages">
-      <button class="tool wide" data-act="organize" title="Rearrange pages (G) — drag pages into a new order, rotate, delete, replace, extract"><i data-icon="grid"></i><span>Rearrange pages</span></button>
-      <button class="tool" data-act="pgup" title="Move this page up (Ctrl+Shift+↑)"><i data-icon="up"></i></button>
-      <button class="tool" data-act="pgdown" title="Move this page down (Ctrl+Shift+↓)"><i data-icon="down"></i></button>
-      <button class="tool wide" data-act="moveto" title="Move this page to a position"><i data-icon="swap"></i><span>Move to…</span></button>
-      <button class="tool wide" data-act="mergedlg" title="Merge PDF, Word and image files in the order you choose"><i data-icon="merge"></i><span>Merge files</span></button>
+      <button class="tool wide" data-act="organize" title="Rearrange pages (G) — drag pages into a new order, rotate, delete, replace, extract"><i data-icon="grid"></i><span>Rearrange</span></button>
+      <button class="tool wide" data-act="merge" title="Add pages from other PDF, Word or image files to this document"><i data-icon="merge"></i><span>Add files</span></button>
+      <button class="tool wide" data-act="blank" title="Insert a blank page after this one"><i data-icon="plus"></i><span>Blank page</span></button>
       <span class="sep"></span>
-      <button class="tool wide" data-act="blank" title="Insert a blank page after this one"><i data-icon="plus"></i><span>Blank</span></button>
-      <button class="tool" data-act="dup" title="Duplicate this page"><i data-icon="copy"></i></button>
-      <button class="tool" data-act="rotl" title="Rotate this page left"><i data-icon="rotatel"></i></button>
-      <button class="tool" data-act="rotr" title="Rotate this page right"><i data-icon="rotate"></i></button>
-      <button class="tool danger" data-act="delpage" title="Delete this page"><i data-icon="trash"></i></button>
+      <button class="tool" data-act="rotl" data-label="Rotate left" title="Rotate this page left"><i data-icon="rotatel"></i></button>
+      <button class="tool" data-act="rotr" data-label="Rotate right" title="Rotate this page right"><i data-icon="rotate"></i></button>
+      <button class="tool" data-act="dup" data-label="Duplicate" title="Duplicate this page"><i data-icon="copy"></i></button>
+      <button class="tool wide" data-act="moveto" title="Move this page to a position (Ctrl+Shift+Up / Down moves it one step)"><i data-icon="swap"></i><span>Move to…</span></button>
+      <button class="tool danger" data-act="delpage" data-label="Delete" title="Delete this page"><i data-icon="trash"></i></button>
       <span class="sep"></span>
-      <button class="tool wide" data-act="replacepage" title="Replace this page with pages from another file"><i data-icon="swap"></i><span>Replace</span></button>
       <button class="tool wide" data-act="extract" title="Save chosen pages as a new PDF"><i data-icon="split"></i><span>Extract</span></button>
+      <button class="tool wide" data-act="replacepage" title="Replace this page with pages from another file"><i data-icon="swap"></i><span>Replace</span></button>
       <button class="tool wide" data-act="resize" title="Change page size (A4, Letter…)"><i data-icon="fit"></i><span>Page size</span></button>
       <button class="tool wide" data-tool="crop" title="Crop — keep only part of the page"><i data-icon="crop"></i><span>Crop</span></button>
-      <button class="tool wide" data-act="pagenum" title="Add page numbers"><i data-icon="hash"></i><span>Numbers</span></button>
-      <button class="tool wide" data-act="bookmarks" title="Bookmarks shown in the reader's side panel"><i data-icon="bookmark"></i><span>Bookmarks</span></button>
     </div>
 
     <div class="pane" data-pane="convert">
       <button class="tool wide" data-act="pdf2docx" title="PDF → Word (.docx)"><i data-icon="word"></i><span>To Word</span></button>
-      <button class="tool wide" data-act="docx2pdf" title="Word (.docx) → PDF"><i data-icon="word"></i><span>From Word</span></button>
       <button class="tool wide" data-act="pdf2img" title="PDF → PNG / JPG images"><i data-icon="image"></i><span>To images</span></button>
-      <button class="tool wide" data-act="imgpages" title="Images → PDF pages"><i data-icon="image"></i><span>From images</span></button>
       <button class="tool wide" data-act="exporttxt" title="Export all text as a .txt file"><i data-icon="text"></i><span>To text</span></button>
-      <button class="tool wide" data-act="writer" title="Check spelling and grammar, humanize the wording (Word, text or this PDF)"><i data-icon="spell"></i><span>Spelling &amp; grammar</span></button>
+      <button class="tool wide" data-act="docx2pdf" title="Word (.docx) → PDF"><i data-icon="word"></i><span>From Word</span></button>
+      <button class="tool wide" data-act="imgpages" title="Images → PDF pages"><i data-icon="image"></i><span>From images</span></button>
       <span class="sep"></span>
       <button class="tool wide" data-act="compress" title="Make the PDF smaller — text stays selectable"><i data-icon="compress"></i><span>Compress</span></button>
       <button class="tool wide" data-act="splitzip" title="Split into single-page PDFs (ZIP)"><i data-icon="split"></i><span>Split</span></button>
-      <button class="tool wide" data-act="png" title="Export this page as a PNG"><i data-icon="image"></i><span>Page → PNG</span></button>
-      <span class="sep"></span>
       <button class="tool wide" data-act="ocrall" title="Read scanned pages and keep the text as an invisible, searchable layer"><i data-icon="scan"></i><span>Make searchable</span></button>
+      <span class="sep"></span>
       <button class="tool wide" data-act="compare" title="Compare this document with another PDF"><i data-icon="swap"></i><span>Compare</span></button>
       <button class="tool wide" data-act="batch" title="Compress, OCR, watermark or number many PDFs at once"><i data-icon="layers"></i><span>Batch</span></button>
     </div>
 
     <div class="pane" data-pane="secure">
       <button class="tool wide" data-act="protect" title="Save a copy that needs a password to open (AES encryption)"><i data-icon="lock"></i><span>Password protect</span></button>
-      <button class="tool wide" data-act="flatten" title="Turn pages into pictures — makes whiteout, blackout and edits permanent"><i data-icon="layers"></i><span>Flatten (permanent redaction)</span></button>
-      <button class="tool wide" data-tool-jump="redact" data-act="tool" data-t="redact" title="Draw blackout boxes over sensitive content"><i data-icon="redact"></i><span>Blackout</span></button>
+      <button class="tool wide" data-tool="redact" title="Black out (redact) — drag a box over sensitive content; when you save, it is removed for good"><i data-icon="redact"></i><span>Black out</span></button>
+      <button class="tool wide" data-act="flatten" title="Turn pages into pictures — makes whiteout, blackout and edits permanent"><i data-icon="layers"></i><span>Flatten pages</span></button>
       <span class="sep"></span>
       <button class="tool wide" data-act="props" title="Title, author and other document details"><i data-icon="info"></i><span>Properties</span></button>
     </div>
   </div>
 
   <div id="props" data-ctx="shape">
+    <span id="ctxhint"></span>
     <button class="tgl wide for-edittext" id="pPara" title="Paragraph mode — edit whole paragraphs instead of single lines"><b>¶</b><span>Paragraphs</span></button>
-    <button class="tool wide for-edittext" data-act="ocr" title="Read all the text on this page with OCR — for scans, flattened pages and text inside pictures (works offline)"><i data-icon="scan"></i><span>Read page (OCR)</span></button>
+    <button class="tool wide for-edittext" data-act="ocr" title="Read all the text on this page with OCR — for scans, flattened pages and text inside pictures (works offline)"><i data-icon="scan"></i><span>Recognise text (OCR)</span></button>
     <select id="pOcrLang" class="for-edittext" title="Language of the text to recognise"></select>
     <button class="tool wide for-image" data-act="imgedit" title="Filters, crop, rotate, flip"><i data-icon="sliders"></i><span>Edit image</span></button>
     <button class="tool wide for-image" data-act="bgremove" title="Remove the image background"><i data-icon="wand"></i><span>Remove BG</span></button>
@@ -200,11 +192,21 @@
 
   <section id="welcome">
     <div class="hero">
-      <svg class="logo big" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="url(#lg)"/><path d="M9 9l14 14M23 9L9 23" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/></svg>
+      <svg class="pdfart" viewBox="0 0 120 112" aria-hidden="true">
+        <defs><linearGradient id="pdfRed" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fb7185"/><stop offset="1" stop-color="#e11d48"/></linearGradient></defs>
+        <ellipse cx="60" cy="104" rx="34" ry="5" class="pa-shadow"/>
+        <g class="pa-back"><path d="M44 14h30l16 16v52a6 6 0 0 1-6 6H44a6 6 0 0 1-6-6V20a6 6 0 0 1 6-6z"/></g>
+        <path class="pa-page" d="M30 8h36l20 20v62a7 7 0 0 1-7 7H30a7 7 0 0 1-7-7V15a7 7 0 0 1 7-7z"/>
+        <path class="pa-fold" d="M66 8v13a7 7 0 0 0 7 7h13z"/>
+        <rect class="pa-line" x="33" y="34" width="34" height="4" rx="2"/><rect class="pa-line" x="33" y="43" width="42" height="4" rx="2"/><rect class="pa-line" x="33" y="52" width="26" height="4" rx="2"/>
+        <rect x="12" y="62" width="58" height="26" rx="7" fill="url(#pdfRed)"/>
+        <text x="41" y="80.5" text-anchor="middle" class="pa-txt">PDF</text>
+        <circle cx="88" cy="80" r="15" fill="url(#lg)"/><path d="M81 80l5 5 9-10" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
       <h1>XD3 PDF Editor</h1>
       <p class="tag">Free · Fast · Private · Works offline — your files never leave your device.</p>
       <div class="dropzone" data-act="open">
-        <i data-icon="upload"></i>
+        <div class="ftypes" aria-hidden="true"><span class="ft ft-pdf">PDF</span><span class="ft ft-doc">DOCX</span><span class="ft ft-img">JPG</span><i data-icon="upload"></i></div>
         <b>Drop PDF, Word or image files here</b>
         <span>or click to browse — drop several to merge them</span>
       </div>
@@ -219,17 +221,29 @@
         <button class="btn" data-act="newdoc"><i data-icon="plus"></i><span>New blank PDF</span></button>
         <button class="btn" data-act="restore" id="bRestore" hidden><i data-icon="undo"></i><span>Restore last session</span></button>
       </div>
+      <section class="wassist" aria-label="Spelling, grammar and AI Humanizer">
+        <div class="wa-head"><i data-icon="spell"></i><div><b>Spelling, grammar &amp; AI Humanizer</b><span>Paste text or open a Word, text or PDF file — checked on your device, nothing is uploaded</span></div></div>
+        <textarea id="waText" rows="4" spellcheck="false" placeholder="Paste or type your text here…"></textarea>
+        <div class="wa-acts">
+          <button class="btn primary" data-act="h_wcheck" title="Underline every spelling and grammar mistake, with suggestions"><i data-icon="spell"></i><span>Check spelling &amp; grammar</span></button>
+          <button class="btn" data-act="h_wfix" title="Correct every clear spelling and grammar mistake in one go (Ctrl+Z undoes it)"><i data-icon="wand"></i><span>Auto-correct all</span></button>
+          <button class="btn" data-act="h_whuman" title="Make AI-sounding or stiff text read naturally — plainer words, fewer stock phrases"><i data-icon="sparkle"></i><span>AI Humanizer</span></button>
+          <button class="btn" data-act="h_wfile" title="Check a Word (.docx) or text file — Word files keep their formatting"><i data-icon="word"></i><span>Check a Word / text file</span></button>
+          <button class="btn" data-act="h_wpdf" title="Check the text of a PDF and write the fixes back into it"><i data-icon="pdf"></i><span>Check a PDF</span></button>
+        </div>
+      </section>
+      <h2 class="feathead">Everything you can do</h2>
       <div class="feats">
-        <div><i data-icon="edittext"></i><b>Edit text</b><span>Rewrite any text in its original font — even in scans and pictures (offline OCR) — fill in forms, find &amp; replace</span></div>
-        <div><i data-icon="editobj"></i><b>Edit objects</b><span>Move, resize, rotate, align or delete anything on the page</span></div>
-        <div><i data-icon="merge"></i><b>Merge &amp; rearrange</b><span>Combine PDF, Word and images; drag pages into order, replace, resize, number</span></div>
-        <div><i data-icon="word"></i><b>Word editor</b><span>Edit .docx files with their own fonts and styles — Auto Format, Fix Formatting, tables, pictures, spelling</span></div>
-        <div><i data-icon="spell"></i><b>Write better</b><span>Spelling, grammar, humanize and readability for Word, text and PDFs — all offline</span></div>
-        <div><i data-icon="word"></i><b>Convert</b><span>PDF ⇄ Word, PDF → images, images → PDF, export text</span></div>
-        <div><i data-icon="compress"></i><b>Compress</b><span>Shrink PDFs while keeping text selectable</span></div>
-        <div><i data-icon="lock"></i><b>Protect</b><span>Password-protect with AES encryption, permanent redaction</span></div>
-        <div><i data-icon="scan"></i><b>Scan &amp; OCR</b><span>Camera to PDF, searchable scans in 14 languages, compare versions, batch processing</span></div>
-        <div><i data-icon="sign"></i><b>Sign &amp; annotate</b><span>Signatures, stamps, highlights, notes, shapes</span></div>
+        <button data-act="h_tool" data-t="edittext"><i data-icon="edittext"></i><b>Edit text</b><span>Rewrite any text in its original font — even in scans and pictures (offline OCR) — fill in forms, find &amp; replace</span></button>
+        <button data-act="h_tool" data-t="editobj"><i data-icon="editobj"></i><b>Move content</b><span>Move, resize, rotate, align or delete anything on the page</span></button>
+        <button data-act="mergedlg"><i data-icon="merge"></i><b>Merge &amp; rearrange</b><span>Combine PDF, Word and images; drag pages into order, replace, resize, number</span></button>
+        <button data-act="dx"><i data-icon="word"></i><b>Word editor</b><span>Edit .docx files with their own fonts and styles — Auto Format, Fix Formatting, tables, pictures, spelling</span></button>
+        <button data-act="writer"><i data-icon="spell"></i><b>Write better</b><span>Spelling, grammar, AI humanizer and readability for Word, text and PDFs — all offline</span></button>
+        <button data-act="h_menu" data-m="convert"><i data-icon="swap"></i><b>Convert</b><span>PDF ⇄ Word, PDF → images, images → PDF, export text</span></button>
+        <button data-act="h_need" data-a="compress"><i data-icon="compress"></i><b>Compress</b><span>Shrink PDFs while keeping text selectable</span></button>
+        <button data-act="h_menu" data-m="protect"><i data-icon="lock"></i><b>Protect</b><span>Password-protect with AES encryption, permanent redaction</span></button>
+        <button data-act="h_menu" data-m="scan"><i data-icon="scan"></i><b>Scan &amp; OCR</b><span>Camera to PDF, searchable scans in 14 languages, compare versions, batch processing</span></button>
+        <button data-act="h_menu" data-m="sign"><i data-icon="sign"></i><b>Sign &amp; annotate</b><span>Signatures, stamps, highlights, notes, shapes</span></button>
       </div>
       <section id="recent" hidden></section>
       <footer>© <span id="yr"></span> XD3Labs · XDCybertech Pvt Ltd — Free forever. Right-click anywhere for quick actions.</footer>
@@ -256,7 +270,7 @@
 
 <section id="org" hidden>
   <header>
-    <b>Organize pages</b><span id="orgInfo"></span>
+    <b>Rearrange pages</b><span id="orgInfo"></span>
     <div class="spacer"></div>
     <button class="btn line" data-o="all">Select all</button>
     <button class="btn line" data-o="none">Clear</button>
@@ -285,8 +299,26 @@
 <div class="menu fx" id="mFonts"></div>
 <div class="menu fx" id="mNotes"></div>
 <div class="menu fx" id="mMore">
+  <div class="mhead needdoc">View</div>
+  <button class="needdoc tog" data-act="sidebar" data-tog="sidebar" title="Show or hide the page thumbnails"><i data-icon="panel"></i><span>Page thumbnails</span><b class="sw"></b></button>
+  <button class="needdoc tog" data-act="spread" data-tog="spread" title="Two pages side by side"><i data-icon="spread"></i><span>Two pages side by side</span><b class="sw"></b></button>
+  <button class="needdoc tog" data-act="night" data-tog="night" title="Dim the pages for reading at night"><i data-icon="moon"></i><span>Night colours</span><b class="sw"></b></button>
+  <button class="needdoc tog" data-act="fullscreen" data-tog="fullscreen" title="Full screen"><i data-icon="expand"></i><span>Full screen</span><b class="sw"></b></button>
+  <hr class="needdoc">
+  <div class="mhead needdoc">This document</div>
+  <button class="needdoc" data-act="props" title="Title, author and other details"><i data-icon="info"></i><span>Properties…</span></button>
+  <button class="needdoc" data-act="bookmarks" title="Bookmarks shown in the reader's side panel"><i data-icon="bookmark"></i><span>Bookmarks…</span></button>
+  <button class="needdoc" data-act="png" title="Export this page as a PNG"><i data-icon="image"></i><span>Export this page as PNG</span></button>
+  <button class="needdoc" data-act="selall" title="Select everything you added on this page"><i data-icon="selall"></i><span>Select all on page</span><kbd>Ctrl+A</kbd></button>
+  <button class="needdoc tog" data-act="annots" data-tog="annots" title="On: shapes, highlights, pen strokes and notes are saved as PDF comments that other readers can edit or hide. Off: they become part of the page."><i data-icon="note"></i><span>Save notes &amp; shapes as comments</span><b class="sw"></b></button>
+  <button class="needdoc danger" data-act="clearpage" title="Remove everything added or changed on this page (Ctrl+Z undoes it)"><i data-icon="eraser"></i><span>Remove all edits on this page</span></button>
+  <hr class="needdoc">
+  <div class="mhead">Create</div>
+  <button data-act="newdoc" title="Start a new, empty PDF"><i data-icon="plus"></i><span>New blank document</span></button>
+  <button data-act="mergedlg" title="Combine PDF, Word and image files in the order you choose"><i data-icon="merge"></i><span>Merge files in a chosen order…</span></button>
+  <hr>
   <div class="mhead">Appearance</div>
-  <button data-act="theme" title="Switch between dark and light"><i data-icon="moon"></i><span>Dark / light theme</span></button>
+  <button data-act="theme" title="Switch between dark and light"><i data-icon="sun"></i><span>Light / dark theme</span></button>
   <div class="swatches">
     <button data-act="accent" data-v="violet" title="Violet accent" style="--sw:#7c5cff;background:#7c5cff"></button>
     <button data-act="accent" data-v="ocean" title="Ocean accent" style="--sw:#3b82f6;background:#3b82f6"></button>
@@ -296,16 +328,12 @@
     <button data-act="accent" data-v="gold" title="Gold accent" style="--sw:#d9a014;background:#d9a014"></button>
   </div>
   <hr>
-  <button data-act="palette" title="Search every command (Ctrl+K)"><i data-icon="bolt"></i><span>Search commands</span><kbd>Ctrl+K</kbd></button>
-  <button data-act="newdoc"><i data-icon="pages"></i>New blank document</button>
-  <button data-act="props"><i data-icon="info"></i>Document properties…</button>
-  <button data-act="bookmarks"><i data-icon="bookmark"></i>Bookmarks…</button>
-  <button data-act="annots" title="On: shapes, highlights, pen strokes and sticky notes are saved as PDF comments that other readers can edit or hide. Off: they are flattened into the page."><i data-icon="check"></i>Save shapes &amp; notes as PDF comments</button>
-  <button data-act="clearpage" class="danger"><i data-icon="trash"></i>Remove all edits on page</button>
-  <hr>
-  <button data-act="dlwin"><i data-icon="windows"></i>Download for Windows…</button>
-  <button data-act="shortcuts"><i data-icon="key"></i>Keyboard shortcuts</button>
-  <button data-act="about"><i data-icon="info"></i>About</button>
+  <div class="mhead">Help</div>
+  <button data-act="tips" title="Show the quick tips again"><i data-icon="info"></i><span>Quick tips</span></button>
+  <button data-act="shortcuts" title="Every keyboard shortcut"><i data-icon="key"></i><span>Keyboard shortcuts</span></button>
+  <button data-act="palette" title="Search every command (Ctrl+K)"><i data-icon="bolt"></i><span>Search all commands</span><kbd>Ctrl+K</kbd></button>
+  <button data-act="dlwin" title="Get the editor as a Windows program"><i data-icon="windows"></i><span>Download for Windows…</span></button>
+  <button data-act="about" title="Version and credits"><i data-icon="info"></i><span>About XD3 PDF Editor</span></button>
 </div>
 <div class="menu fx" id="mStamps">
   <button data-act="stamp" data-t="APPROVED" data-c="#16a34a"><i data-icon="stamp"></i>Approved</button>
@@ -355,6 +383,7 @@
 <script src="js/insert.js"></script>
 <script src="js/imaging.js"></script>
 <script src="js/convert.js"></script>
+<script src="js/home.js"></script>
 <script src="js/forms.js"></script>
 <script src="js/extras.js"></script>
 <script src="js/reader.js"></script>
