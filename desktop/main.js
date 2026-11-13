@@ -14,6 +14,7 @@ const winreg = require('./winreg.js')({ exe: process.execPath, root: process.env
 const canRegister = process.platform === 'win32' && (app.isPackaged || !!process.env.XD3_REG_ROOT);
 const osInfo = () => { const [major, minor, build] = os.release().split('.').map(Number); return { major, minor, build, name: major >= 10 ? (build >= 22000 ? 'Windows 11' : 'Windows 10') : { 1: 'Windows 7', 2: 'Windows 8', 3: 'Windows 8.1' }[minor] || 'Windows' }; };
 
+const ISOLATE = { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' }; // (cross-origin isolation: the offline AI can use several processor cores)
 protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } }]);
 if (process.platform === 'win32') app.setAppUserModelId('in.xdcybertech.xd3pdfeditor');
 
@@ -93,7 +94,7 @@ else {
       if (p.startsWith('/__open__/')) { const f = opened.get(p.split('/')[2]); return callback(f ? { path: f } : { error: -6 }); }
       if (p === '/' || p === '') p = '/index.html';
       const file = path.normalize(path.join(ROOT, p));
-      callback(file.startsWith(ROOT) ? { path: file } : { error: -10 });
+      callback(file.startsWith(ROOT) ? { path: file, headers: ISOLATE } : { error: -10 });
     });
     session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => cb(['media', 'clipboard-read', 'clipboard-sanitized-write'].includes(permission))); // camera for Scan, clipboard for the right-click menu
     Menu.setApplicationMenu(null);

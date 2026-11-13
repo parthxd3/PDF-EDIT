@@ -6,7 +6,7 @@ const X = window.XD3, { S } = X, results = [], t0 = performance.now();
 const ok = (name, cond, detail = '') => { results.push({ name, ok: !!cond, detail: String(detail) }); console[cond ? 'log' : 'error'](`${cond ? 'PASS' : 'FAIL'} ${name} ${detail}`); };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const load = async (name, type = 'application/pdf') => { const res = await fetch('tests/samples/' + name); if (!res.ok) throw new Error('sample missing: ' + name); S.dirty = false; await X.openFiles([new File([await res.blob()], name, { type })], false); const p = S.pages[0]; X.visible.add(p.id); return p; };
-const items = async p => { X.setTool('edittext'); await X.ocrItems(p); await sleep(50); await X.drawTI(p); return X.PE.get(p.id).items || []; };
+const items = async p => { X.setTool('edittext'); for (let k = 0; k < 3; k++) { X.visible.add(p.id); /* (a hidden test window never reports the page as on screen, and reading gives up on pages off screen) */ if ((await X.ocrItems(p)).length) break; await sleep(200); } await sleep(50); await X.drawTI(p); return X.PE.get(p.id).items || []; };
 const reopen = bytes => pdfjsLib.getDocument({ data: bytes.slice(), cMapUrl: 'lib/cmaps/', cMapPacked: true, standardFontDataUrl: 'lib/standard_fonts/', isEvalSupported: false, fontExtraProperties: true }).promise;
 const pixelDiff = async (a, b, n = 1) => { // pages rendered at 3× and compared: number of clearly different pixels
   const draw = async bytes => { const pdf = await reopen(bytes), pg = await pdf.getPage(n), vp = pg.getViewport({ scale: 3 }), c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; const x = c.getContext('2d', { willReadFrequently: true }); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); await pg.render({ canvasContext: x, viewport: vp, intent: 'print' }).promise; return x.getImageData(0, 0, c.width, c.height).data; };
@@ -159,6 +159,56 @@ async function run() {
     ok('to Word: edits are converted, replaced text is gone', words(xml).includes('Customerhappinessreachedarecord') && !words(xml).includes('Customersatisfactionrose'));
     p = await load('searchable.pdf'); ({ xml } = await docOf(await X.buildDocx(S.pages)));
     ok('to Word: a scan keeps its look, its hidden text stays hidden', /w14:alpha w14:val="100000"/.test(xml) && words(xml).includes('Totalamountpayable') && /Page design/.test(xml));
+    p = await load('layout.pdf'); const ez = await JSZip.loadAsync(await X.buildDocx(S.pages, 'edit')), ex = await ez.file('word/document.xml').async('string'), est = await ez.file('word/styles.xml').async('string');
+    const paraTexts = [...ex.matchAll(/<w:p>.*?<\/w:p>/g)].map(m => m[0].replace(/<[^>]+>/g, ''));
+    ok('to Word (editable): real paragraphs, headings, lists and a table', (ex.match(/<wps:txbx>/g) || []).length <= 1 /* (only the turned margin label) */ && (ex.match(/<w:tbl>/g) || []).length === 1 && !!ez.file('word/numbering.xml') && /w:pStyle w:val="Heading1"/.test(ex) && /styleId="Heading1"/.test(est)
+      && paraTexts.some(t => /twelve percent this year, driven by strong demand/.test(t)) && paraTexts.some(t => t === 'Open two new branches in Pune and Jaipur by March.'), `${(ex.match(/<w:tbl>/g) || []).length} tables`);
+    // exact layout (the default): same look, but real paragraphs — one section per page, exact line spacing, no text boxes except turned text
+    const eb = await X.buildDocx(S.pages, 'exact'), xz = await JSZip.loadAsync(eb), xx = await xz.file('word/document.xml').async('string');
+    const xBoxes = (xx.match(/<wps:txbx>/g) || []).length, xSect = (xx.match(/<w:sectPr/g) || []).length, xParas = (xx.match(/<w:p[ >]/g) || []).length;
+    ok('to Word (exact): flowing paragraphs, one section per page, nothing falls back', xBoxes <= 1 && xSect === S.pages.length && xParas > 20 && /w:lineRule="exact"/.test(xx) && !(eb.fallback || []).length
+      && ['AnnualPerformanceReview', 'twelvepercentthisyear', 'Smallsteps'].every(t => words(xx).includes(t)), `${xBoxes} boxes, ${xSect} sections, ${xParas} paragraphs, fallback [${eb.fallback}]`);
+  }
+  // ── tools: every tool in the registry has a card on the home screen and a working page ──
+  if (X.flow) {
+    const T = X.flow.TOOLS, cards = new Set([...document.querySelectorAll('#toolGrid .tcard[data-t]')].map(e => e.dataset.t));
+    ok('tools: registry and home grid', T.length >= 20 && T.filter(t => cards.has(t.id)).length >= T.length * 0.9 && !!X.flow.byId['pdf-to-word'], `${T.length} tools, ${T.filter(t => cards.has(t.id)).length} cards`);
+  }
+  // ── offline app: the website offers the Windows download and the browser install ──
+  if (/^https?:$/.test(location.protocol) && !window.xd3desk) {
+    ok('offline app: download offered on the home screen', typeof X.ACT.dlwin === 'function' && !!document.querySelector('.appband[data-act=dlwin]') && !!document.querySelector('#topbar .getapp') && !!(X.windowsApp && X.windowsApp.show));
+  }
+  // ── home: the start screen with the file kept open; fonts: the bigger library embeds into a PDF ──
+  {
+    let p = await load('layout.pdf'); X.ACT.home();
+    ok('home: start screen shown, the file stays open under Continue', document.body.classList.contains('athome') && getComputedStyle(document.querySelector('#welcome')).display !== 'none' && !!document.querySelector('#continue .cont') && S.pages.length === 1);
+    X.ACT.resume(); ok('home: Continue editing goes back to the file', !document.body.classList.contains('athome'));
+    ok('fonts: 140+ families, with the Office names', Object.keys(X.BUNDLED).length >= 140 && !!X.BUNDLED['Arial'] && !!X.BUNDLED['Times New Roman'] && !!X.BUNDLED['Calibri']);
+    p.objs.push(X.textObj('Inter and Arial in a saved PDF', 18, { x: 60, y: 760, font: 'Inter' }), X.textObj('Arial look-alike', 18, { x: 60, y: 790, font: 'Arial', bold: true }));
+    await X.ensureFont('Inter'); await X.ensureFont('Arial');
+    const fpdf = await reopen(await X.buildPdf(S.pages)), ftx = await textOf(fpdf);
+    ok('fonts: new families embed and stay searchable', /Inter and Arial in a saved PDF/.test(ftx) && /Arial look-alike/.test(ftx), ftx.slice(-80));
+  }
+  // ── more tools: PowerPoint, Excel, pictures out, hidden data, blank pages, underline / strike through ──
+  if (X.tools) {
+    const D0 = X.dialog, DL0 = X.download, C0 = window.confirm, got = [], ans = [];
+    X.dialog = async (...a) => ans.length ? ans.shift() : D0(...a); X.download = (b, n) => got.push({ b, n }); window.confirm = () => true;
+    try {
+      let p = await load('layout.pdf');
+      ans.push({ q: '110|0.8' }); await X.tools.toPptx(); const pz = await JSZip.loadAsync(got.pop().b);
+      ok('to PowerPoint: one slide per page, page-sized', !!pz.file('ppt/slides/slide1.xml') && !pz.file('ppt/slides/slide2.xml') && /sldSz cx="7555991"/.test(await pz.file('ppt/presentation.xml').async('string')));
+      ans.push({ mode: 'one' }); await X.tools.toXlsx(); const xs = await (await JSZip.loadAsync(got.pop().b)).file('xl/worksheets/sheet1.xml').async('string');
+      ok('to Excel: table columns line up, numbers are numbers', /<c r="A\d+" t="inlineStr"><is><t xml:space="preserve">Region<\/t>.*?Revenue/.test(xs) && /<c r="B(\d+)"><v>4250000<\/v><\/c><c r="C\1"><v>610000<\/v>/.test(xs));
+      X.ACT.blank(); X.ACT.blank(); const n0 = S.pages.length; await X.tools.removeBlank(); ok('remove blank pages', n0 === 3 && S.pages.length === 1, `${n0} → ${S.pages.length}`);
+      p = await load('native.pdf'); const L = (await X.visibleText(p)).find(l => /^The quick brown fox/.test(l.str));
+      X.pushUndo(); await X._markupText(p, { x: L.x, y: L.y, w: L.w, h: L.h }, 'u'); await X._markupText(p, { x: L.x, y: L.y, w: 40, h: L.h }, 's');
+      const md = await PDFLib.PDFDocument.load(await X.buildPdf(S.pages)), subs = md.getPages()[0].node.Annots().asArray().map(r => String(md.context.lookup(r).get(PDFLib.PDFName.of('Subtype'))));
+      ok('underline / strike through text: real PDF markup comments', subs.includes('/Underline') && subs.includes('/StrikeOut'), subs.join(' '));
+      ans.push({ meta: true, js: true, att: true, cmt: true, extra: true }); await X.tools.sanitize(); const cb = new Uint8Array(await got.pop().b.arrayBuffer()), cd = await PDFLib.PDFDocument.load(cb, { updateMetadata: false });
+      ok('remove hidden data: no details, no comments, links kept', !/\/Info\s/.test(new TextDecoder('latin1').decode(cb)) && cd.getPages()[0].node.Annots().asArray().every(r => String(cd.context.lookup(r).get(PDFLib.PDFName.of('Subtype'))) === '/Link'));
+      await X.tools.extractImages(); const iz = got.pop(), ik = iz ? Object.keys((await JSZip.loadAsync(iz.b)).files) : [];
+      ok('pictures out: the picture of the page as PNG', ik.length === 1 && /\.png$/.test(ik[0]), ik.join(' '));
+    } finally { X.dialog = D0; X.download = DL0; window.confirm = C0; }
   }
   // ── compress: pictures resampled to where they are shown, duplicates merged, transparency and text untouched ──
   {
@@ -231,8 +281,18 @@ async function run() {
     ok('word: fields, bookmarks and sections stay whole', count(/fldCharType="begin"/g, x) === count(/fldCharType="end"/g, x) && ids('bookmarkStart', x) === ids('bookmarkEnd', x) && ids('commentRangeStart', x) === ids('commentRangeEnd', x) && count(/<w:sectPr/g, x) === 2, `${count(/<w:sectPr/g, x)} sections`);
     DX.undo(); DX.undo(); ok('word: undo', P().some(p => DX.ptext(p).replace(/￼/g, '').startsWith('A sentence with a comment')), P().length);
     // spelling and grammar right in the page
-    DX.D.dirty = false; await DX.newDocument(); document.querySelector('#dxDoc').focus(); document.execCommand('insertText', false, 'This is an importent sentense.'); await wait(50); await DX.lintAll(); await wait(100);
+    DX.D.dirty = false; await DX.newDocument(); document.querySelector('#dxDoc').focus(); document.execCommand('insertText', false, 'This is an importent sentense.'); await wait(50);
+    if (!DX.ptext(P()[0]).trim()) P()[0].replaceChildren('This is an importent sentense.'); // (a window without keyboard focus types nothing)
+    for (let k = 0; k < 40 && !(P()[0]._issues || []).length; k++) { await DX.lintAll(); await wait(150); } // (waits for a check still running on the previous document)
     const iss = (P()[0]._issues || []).map(s => s.word); ok('word: spelling marked in the page', iss.includes('importent') && (!window.Highlight || CSS.highlights.has('dx-spell')), iss.join(','));
+    { const side = document.querySelector('#dxSide .wr-pane, #dxSide [id$="Pane"], #dxSide .dx-pane') || document.querySelector('#dxSide'); document.querySelector('.dx-tabs button[data-t="proof"]').click(); await wait(100);
+      const fixBtn = document.querySelector('#dxSide [data-pfix="all"]'); ok('word: spelling panel shows the sentence, Fix all and Ignore', !!fixBtn && !!document.querySelector('#dxSide .wctx mark') && !!document.querySelector('#dxSide [data-ign]'));
+      if (fixBtn) { fixBtn.click(); await wait(100); } ok('word: Fix all corrects the mistakes', /important/.test(DX.ptext(P()[0])) && !/importent/.test(DX.ptext(P()[0])), DX.ptext(P()[0])); DX.undo(); }
+    if (X.ai && X.ai.supported() && !/noai/.test(location.search)) { // the offline AI (skipped with ?selftest=1&noai)
+      try { const r = await X.ai.run('fix', 'We was going too the market yesterday.'); ok('AI: offline grammar fix', /were going to the market/i.test(r.text) && !r.refused, r.text);
+        const h = await X.ai.run('shorter', 'We would like to take this opportunity to let you know that the meeting has now been moved to Friday afternoon.'); ok('AI: shorter text, no chatter around it', h.text && h.text.length < 110 && !/^(here|sure)/i.test(h.text), h.text);
+      } catch (e) { ok('AI: offline model runs', false, e.message); }
+    }
     // Fix Formatting and Auto Format
     DX.D.dirty = false; await DX.openFile(await sample('messy.docx'));
     const keys = DX.checks().map(c => c.key); ok('word: Fix Formatting finds the problems', ['headings', 'lists', 'fonts', 'sizes', 'spaces', 'empty', 'indent', 'breaks', 'quotes', 'align'].every(k => keys.includes(k)), keys.join(','));

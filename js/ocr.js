@@ -114,19 +114,23 @@ async function run(p, regs, lang, force) {
   return out.filter(o => { const cx = o.x + o.w / 2, cy = o.y + o.h / 2; return !nat.some(l => cx > l.x && cx < l.x + l.w && cy > l.y && cy < l.y + l.h); });
 }
 const cache = new Map(), keyOf = p => X.baseSig(p) + '|' + ocrLang();
-function ocrItems(p, force) { // lines of text recognised in the page's pictures (or, with `force`, on the whole page); remembered per page
+function ocrItems(p, force, strict) { // lines of text recognised in the page's pictures (or, with `force`, on the whole page); remembered per page
+  // `strict`: a failure (the engine could not load…) is thrown to the caller instead of being shown as a message and read as "no text"
   const lang = ocrLang(), key = keyOf(p); let e = cache.get(key);
-  if (e && (e.full || !force)) return e.promise;
-  e = { full: !!force, lines: null };
-  e.promise = (async () => {
-    const regs = force ? Object.assign([{ x: 0, y: 0, w: p.w, h: p.h }], { full: true }) : await targets(p);
-    if (regs.full) e.full = true; if (!regs.length) return e.lines = [];
-    const lines = e.lines = await run(p, regs, lang, force);
-    if (!force && lines.length && S.tool === 'edittext') toast(`Recognised ${lines.length} line(s) of text in ${regs.full ? 'this scanned page' : 'the pictures on this page'} — click one to edit it`, 'success');
-    return lines;
-  })().catch(err => { cache.delete(key); if (err && err.message === 'skip') return []; console.error(err); toast('Text recognition did not work: ' + (err && err.message || err), true); return []; });
-  cache.set(key, e); if (cache.size > 80) cache.delete(cache.keys().next().value);
-  return e.promise;
+  if (!e || (force && !e.full)) {
+    e = { full: !!force, lines: null };
+    e.raw = (async () => {
+      const regs = force ? Object.assign([{ x: 0, y: 0, w: p.w, h: p.h }], { full: true }) : await targets(p);
+      if (regs.full) e.full = true; if (!regs.length) return e.lines = [];
+      const lines = e.lines = await run(p, regs, lang, force);
+      if (!force && lines.length && S.tool === 'edittext') toast(`Recognised ${lines.length} line(s) of text in ${regs.full ? 'this scanned page' : 'the pictures on this page'} — click one to edit it`, 'success');
+      return lines;
+    })();
+    const mine = e; e.raw.catch(() => { if (cache.get(key) === mine) cache.delete(key); });
+    cache.set(key, e); if (cache.size > 80) cache.delete(cache.keys().next().value);
+  }
+  if (strict) return e.raw.catch(err => { if (err && err.message === 'skip') return []; throw err; });
+  return e.soft || (e.soft = e.raw.catch(err => { if (err && err.message === 'skip') return []; console.error(err); toast('Text recognition did not work: ' + (err && err.message || err), true); return []; }));
 }
 const ocrCached = p => { const e = cache.get(keyOf(p)); return (e && e.lines) || []; };
 
@@ -216,4 +220,7 @@ if (sel) {
   sel.addEventListener('keydown', e => e.stopPropagation());
 }
 Object.assign(X, { ocrItems, ocrCached, fitLine });
+// every file the OCR engine can ask for (the hosted copy keeps them on the device for offline use): the engine and English first, then the chosen language, then the rest
+X.OCR_FILES = () => { const ls = ['eng', ...ocrLang().split('+'), ...Object.keys(LANGS).join('+').split('+')];
+  return ['tesseract.min.js', 'worker.min.js', 'tesseract-core-simd-lstm.wasm.js', 'tesseract-core-lstm.wasm.js', ...[...new Set(ls)].map(l => l + '.traineddata.gz')].map(f => 'lib/ocr/' + f); };
 })();

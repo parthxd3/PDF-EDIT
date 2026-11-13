@@ -13,7 +13,8 @@ Options -Indexes
 
 <IfModule mod_mime.c>
   AddDefaultCharset utf-8
-  AddType text/javascript .js
+  AddType text/javascript .js .mjs
+  AddType application/octet-stream .onnx
   AddType font/ttf .ttf
   AddType application/octet-stream .bcmap .pfb
   # OCR language data is unpacked by the app itself: serve the .gz files as plain downloads
@@ -33,6 +34,9 @@ Options -Indexes
 <IfModule mod_headers.c>
   Header set X-Content-Type-Options "nosniff"
   Header set Referrer-Policy "no-referrer"
+  # cross-origin isolation: lets the offline AI writing assistant use several processor cores (the app loads nothing from other sites)
+  Header set Cross-Origin-Opener-Policy "same-origin"
+  Header set Cross-Origin-Embedder-Policy "require-corp"
   # the same lock-down as the <meta> tag in index.html, as a real header
   Header set Content-Security-Policy "default-src 'self' data: blob:; script-src 'self' blob: 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:; worker-src 'self' blob:; frame-src blob:; media-src 'self' blob: mediastream:; object-src 'none'; base-uri 'none'"
   # The page and its own scripts are re-checked on every visit, so an update shows at once ...

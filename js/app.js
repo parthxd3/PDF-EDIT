@@ -17,6 +17,9 @@ const PDF_FONTS = {
 };
 // fonts shipped in lib/fonts and embedded into saved PDFs: family → [file stem, has a bold file, CSS fallback, group]
 const BUNDLED = {
+  // the everyday Office names, drawn with free fonts of exactly the same letter widths (so text set in them lines up the same)
+  'Arial': ['Arimo', 1, 'sans-serif', 'Popular'], 'Times New Roman': ['Tinos', 1, 'serif', 'Popular'], 'Courier New': ['Cousine', 1, 'monospace', 'Popular'],
+  'Calibri': ['Carlito', 1, 'sans-serif', 'Popular'], 'Cambria': ['Caladea', 1, 'serif', 'Popular'], 'Georgia': ['Gelasio', 1, 'serif', 'Popular'], 'Verdana': ['DejaVuSans', 1, 'sans-serif', 'Popular'],
   'Roboto': ['Roboto', 1, 'sans-serif', 'Sans serif'], 'Open Sans': ['OpenSans', 1, 'sans-serif', 'Sans serif'], 'Lato': ['Lato', 1, 'sans-serif', 'Sans serif'],
   'Montserrat': ['Montserrat', 1, 'sans-serif', 'Sans serif'], 'Poppins': ['Poppins', 1, 'sans-serif', 'Sans serif'], 'Raleway': ['Raleway', 1, 'sans-serif', 'Sans serif'],
   'Nunito': ['Nunito', 1, 'sans-serif', 'Sans serif'], 'Ubuntu': ['Ubuntu', 1, 'sans-serif', 'Sans serif'], 'Hind': ['Hind', 1, 'sans-serif', 'Sans serif'],
@@ -27,6 +30,111 @@ const BUNDLED = {
   'Oswald': ['Oswald', 1, 'sans-serif', 'Display'], 'Anton': ['Anton', 0, 'sans-serif', 'Display'], 'Lobster': ['Lobster', 0, 'cursive', 'Display'], 'Comic Neue': ['ComicNeue', 1, 'cursive', 'Display'], 'Permanent Marker': ['PermanentMarker', 0, 'cursive', 'Display'],
   'Caveat': ['Caveat', 1, 'cursive', 'Handwriting'], 'Pacifico': ['Pacifico', 0, 'cursive', 'Handwriting'], 'Satisfy': ['Satisfy', 0, 'cursive', 'Handwriting'], 'Courgette': ['Courgette', 0, 'cursive', 'Handwriting'],
   'Kaushan Script': ['KaushanScript', 0, 'cursive', 'Handwriting'], 'Sacramento': ['Sacramento', 0, 'cursive', 'Handwriting'], 'Allura': ['Allura', 0, 'cursive', 'Handwriting'], 'Great Vibes': ['GreatVibes', 0, 'cursive', 'Handwriting'],
+  // more Google Fonts (static Regular / Bold files, checked to embed cleanly)
+  'Inter': ['Inter', 1, 'sans-serif', 'Sans serif'],
+  'Noto Sans': ['NotoSans', 1, 'sans-serif', 'Sans serif'],
+  'Source Sans 3': ['SourceSans3', 1, 'sans-serif', 'Sans serif'],
+  'Work Sans': ['WorkSans', 1, 'sans-serif', 'Sans serif'],
+  'Mulish': ['Mulish', 1, 'sans-serif', 'Sans serif'],
+  'Rubik': ['Rubik', 1, 'sans-serif', 'Sans serif'],
+  'Karla': ['Karla', 1, 'sans-serif', 'Sans serif'],
+  'Manrope': ['Manrope', 1, 'sans-serif', 'Sans serif'],
+  'DM Sans': ['DMSans', 1, 'sans-serif', 'Sans serif'],
+  'IBM Plex Sans': ['IBMPlexSans', 1, 'sans-serif', 'Sans serif'],
+  'Fira Sans': ['FiraSans', 1, 'sans-serif', 'Sans serif'],
+  'Josefin Sans': ['JosefinSans', 1, 'sans-serif', 'Sans serif'],
+  'Quicksand': ['Quicksand', 1, 'sans-serif', 'Sans serif'],
+  'Cabin': ['Cabin', 1, 'sans-serif', 'Sans serif'],
+  'Barlow': ['Barlow', 1, 'sans-serif', 'Sans serif'],
+  'Archivo': ['Archivo', 1, 'sans-serif', 'Sans serif'],
+  'Libre Franklin': ['LibreFranklin', 1, 'sans-serif', 'Sans serif'],
+  'PT Sans': ['PTSans', 1, 'sans-serif', 'Sans serif'],
+  'Titillium Web': ['TitilliumWeb', 1, 'sans-serif', 'Sans serif'],
+  'Outfit': ['Outfit', 1, 'sans-serif', 'Sans serif'],
+  'Plus Jakarta Sans': ['PlusJakartaSans', 1, 'sans-serif', 'Sans serif'],
+  'Oxygen': ['Oxygen', 1, 'sans-serif', 'Sans serif'],
+  'Heebo': ['Heebo', 1, 'sans-serif', 'Sans serif'],
+  'Assistant': ['Assistant', 1, 'sans-serif', 'Sans serif'],
+  'Mukta': ['Mukta', 1, 'sans-serif', 'Sans serif'],
+  'Exo 2': ['Exo2', 1, 'sans-serif', 'Sans serif'],
+  'Kanit': ['Kanit', 1, 'sans-serif', 'Sans serif'],
+  'Figtree': ['Figtree', 1, 'sans-serif', 'Sans serif'],
+  'Lexend': ['Lexend', 1, 'sans-serif', 'Sans serif'],
+  'Public Sans': ['PublicSans', 1, 'sans-serif', 'Sans serif'],
+  'Red Hat Display': ['RedHatDisplay', 1, 'sans-serif', 'Sans serif'],
+  'Sora': ['Sora', 1, 'sans-serif', 'Sans serif'],
+  'Urbanist': ['Urbanist', 1, 'sans-serif', 'Sans serif'],
+  'Albert Sans': ['AlbertSans', 1, 'sans-serif', 'Sans serif'],
+  'Overpass': ['Overpass', 1, 'sans-serif', 'Sans serif'],
+  'Varela Round': ['VarelaRound', 0, 'sans-serif', 'Sans serif'],
+  'Questrial': ['Questrial', 0, 'sans-serif', 'Sans serif'],
+  'Merriweather': ['Merriweather', 1, 'serif', 'Serif'],
+  'Noto Serif': ['NotoSerif', 1, 'serif', 'Serif'],
+  'Source Serif 4': ['SourceSerif4', 1, 'serif', 'Serif'],
+  'EB Garamond': ['EBGaramond', 1, 'serif', 'Serif'],
+  'Cormorant Garamond': ['CormorantGaramond', 1, 'serif', 'Serif'],
+  'Bitter': ['Bitter', 1, 'serif', 'Serif'],
+  'Arvo': ['Arvo', 1, 'serif', 'Serif'],
+  'Zilla Slab': ['ZillaSlab', 1, 'serif', 'Serif'],
+  'IBM Plex Serif': ['IBMPlexSerif', 1, 'serif', 'Serif'],
+  'Spectral': ['Spectral', 1, 'serif', 'Serif'],
+  'Libre Caslon Text': ['LibreCaslonText', 1, 'serif', 'Serif'],
+  'Domine': ['Domine', 1, 'serif', 'Serif'],
+  'Old Standard TT': ['OldStandardTT', 1, 'serif', 'Serif'],
+  'Cardo': ['Cardo', 1, 'serif', 'Serif'],
+  'Alegreya': ['Alegreya', 1, 'serif', 'Serif'],
+  'Frank Ruhl Libre': ['FrankRuhlLibre', 1, 'serif', 'Serif'],
+  'Prata': ['Prata', 0, 'serif', 'Serif'],
+  'Noticia Text': ['NoticiaText', 1, 'serif', 'Serif'],
+  'Vollkorn': ['Vollkorn', 1, 'serif', 'Serif'],
+  'Literata': ['Literata', 1, 'serif', 'Serif'],
+  'DM Serif Display': ['DMSerifDisplay', 0, 'serif', 'Serif'],
+  'IBM Plex Mono': ['IBMPlexMono', 1, 'monospace', 'Monospace'],
+  'Fira Code': ['FiraCode', 1, 'monospace', 'Monospace'],
+  'JetBrains Mono': ['JetBrainsMono', 1, 'monospace', 'Monospace'],
+  'Courier Prime': ['CourierPrime', 1, 'monospace', 'Monospace'],
+  'Inconsolata': ['Inconsolata', 1, 'monospace', 'Monospace'],
+  'Space Mono': ['SpaceMono', 1, 'monospace', 'Monospace'],
+  'Ubuntu Mono': ['UbuntuMono', 1, 'monospace', 'Monospace'],
+  'Abril Fatface': ['AbrilFatface', 0, 'sans-serif', 'Display'],
+  'Alfa Slab One': ['AlfaSlabOne', 0, 'sans-serif', 'Display'],
+  'Righteous': ['Righteous', 0, 'sans-serif', 'Display'],
+  'Bungee': ['Bungee', 0, 'sans-serif', 'Display'],
+  'Archivo Black': ['ArchivoBlack', 0, 'sans-serif', 'Display'],
+  'Fredoka': ['Fredoka', 1, 'sans-serif', 'Display'],
+  'Comfortaa': ['Comfortaa', 1, 'sans-serif', 'Display'],
+  'Russo One': ['RussoOne', 0, 'sans-serif', 'Display'],
+  'Teko': ['Teko', 1, 'sans-serif', 'Display'],
+  'Staatliches': ['Staatliches', 0, 'sans-serif', 'Display'],
+  'Passion One': ['PassionOne', 1, 'sans-serif', 'Display'],
+  'Lilita One': ['LilitaOne', 0, 'sans-serif', 'Display'],
+  'Bebas Neue': ['BebasNeue', 0, 'sans-serif', 'Display'],
+  'Bowlby One SC': ['BowlbyOneSC', 0, 'sans-serif', 'Display'],
+  'Chewy': ['Chewy', 0, 'sans-serif', 'Display'],
+  'Luckiest Guy': ['LuckiestGuy', 0, 'sans-serif', 'Display'],
+  'Press Start 2P': ['PressStart2P', 0, 'sans-serif', 'Display'],
+  'Monoton': ['Monoton', 0, 'sans-serif', 'Display'],
+  'Bangers': ['Bangers', 0, 'sans-serif', 'Display'],
+  'Dancing Script': ['DancingScript', 1, 'cursive', 'Handwriting'],
+  'Indie Flower': ['IndieFlower', 0, 'cursive', 'Handwriting'],
+  'Shadows Into Light': ['ShadowsIntoLight', 0, 'cursive', 'Handwriting'],
+  'Amatic SC': ['AmaticSC', 1, 'cursive', 'Handwriting'],
+  'Patrick Hand': ['PatrickHand', 0, 'cursive', 'Handwriting'],
+  'Homemade Apple': ['HomemadeApple', 0, 'cursive', 'Handwriting'],
+  'Kalam': ['Kalam', 1, 'cursive', 'Handwriting'],
+  'Gloria Hallelujah': ['GloriaHallelujah', 0, 'cursive', 'Handwriting'],
+  'Architects Daughter': ['ArchitectsDaughter', 0, 'cursive', 'Handwriting'],
+  'Handlee': ['Handlee', 0, 'cursive', 'Handwriting'],
+  'Marck Script': ['MarckScript', 0, 'cursive', 'Handwriting'],
+  'Yellowtail': ['Yellowtail', 0, 'cursive', 'Handwriting'],
+  'Parisienne': ['Parisienne', 0, 'cursive', 'Handwriting'],
+  'Tangerine': ['Tangerine', 1, 'cursive', 'Handwriting'],
+  'Alex Brush': ['AlexBrush', 0, 'cursive', 'Handwriting'],
+  'Cookie': ['Cookie', 0, 'cursive', 'Handwriting'],
+  'Mr Dafoe': ['MrDafoe', 0, 'cursive', 'Handwriting'],
+  'Rock Salt': ['RockSalt', 0, 'cursive', 'Handwriting'],
+  'Nothing You Could Do': ['NothingYouCouldDo', 0, 'cursive', 'Handwriting'],
+  'Reenie Beanie': ['ReenieBeanie', 0, 'cursive', 'Handwriting'],
 };
 for (const n in BUNDLED) FONTS[n] = `"XD3 ${n}", ${BUNDLED[n][2]}`;
 // Ligatures, contextual alternates and kerning are switched off for bundled fonts — on screen (FEAT_CSS) and in the saved PDF (FEAT_OFF) —
@@ -107,6 +215,7 @@ function useXFont(id) { // register a document font with the browser so it can b
 const fontLabel = f => { const x = S.xfonts[f]; return x ? x.name + (x.bold ? ' Bold' : '') + (x.italic ? ' Italic' : '') : f; };
 const AL = { left: 0, center: 0.5, right: 1 };
 const ICONS = {
+  stats: 'M4 20V11M10 20V5M16 20v-6M21 20H3', home: 'M3 11l9-7 9 7M5 9.5V20h5v-6h4v6h5V9.5', slides: 'M3 4h18M4 4v11h16V4M12 15v3m-4 3l4-3 4 3M8 11l3-3 2 2 3-3', shield: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4', reverse: 'M7 4v16m0 0l-3-3m3 3l3-3M17 20V4m0 0l-3 3m3-3l3 3',
   folder: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
   download: 'M12 3v12m0 0l-4-4m4 4l4-4M4 19h16', upload: 'M12 16V4m0 0L8 8m4-4l4 4M4 20h16',
   print: 'M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z',
@@ -120,6 +229,7 @@ const ICONS = {
   sign: 'M3 17c2-6 4-10 6-10s-1 9 2 9 3-6 5-6 1 4 5 4M3 21h18', drop: 'M12 3s6 6 6 11a6 6 0 0 1-12 0c0-5 6-11 6-11z',
   hash: 'M5 9h14M5 15h14M10 4L8 20M16 4l-2 16', stamp: 'M5 21h14M6 17h12v-3H6zM10 14V9a2 2 0 1 1 4 0v5',
   sparkle: 'M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z', pdf: 'M6 3h9l5 5v13H6zM15 3v5h5M8.5 17v-4h1.5a1.2 1.2 0 0 1 0 2.4H8.5M13 13v4h1a2 2 0 0 0 0-4zM18 13h-1.8v4M16.2 15h1.4',
+  speaker: 'M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11', outline: 'M4 6h16M8 11h12M8 16h12M4 11h.01M4 16h.01',
   check: 'M5 12l5 5L20 7', x: 'M6 6l12 12M18 6L6 18', more: 'M5 12h.01M12 12h.01M19 12h.01',
   info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7h.01', key: 'M3 7h18v10H3zM7 11h.01M11 11h.01M15 11h.01M8 14h8',
   panel: 'M3 5h18v14H3zM9 5v14', moon: 'M20 14A8 8 0 1 1 10 4a6 6 0 0 0 10 10z',
@@ -145,6 +255,7 @@ const ICONS = {
   cut: 'M6 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM6 14a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM8 9l12 8M8 15L20 7', spell: 'M4 17l3-10 3 10M5 14h4M13 7h3a2 2 0 0 1 0 4h-3zM13 11h3.5a2 2 0 0 1 0 4H13zM14 19l2 2 5-5', eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z', spread: 'M3 5h8v14H3zM13 5h8v14h-8z', windows: 'M3 5.5l7.5-1v7H3zM12 4.3L21 3v8.5h-9zM3 12.5h7.5v7L3 18.5zM12 12.5h9V21l-9-1.3z', bookmark: 'M6 3h12v18l-6-4-6 4z', link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1', crop: 'M6 2v14a2 2 0 0 0 2 2h14M18 22V8a2 2 0 0 0-2-2H2',
   book: 'M4 5a2 2 0 0 1 2-2h6v18H6a2 2 0 0 0-2 2zM20 5a2 2 0 0 0-2-2h-6v18h6a2 2 0 0 1 2 2z', expand: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5M9 9l-5-5M15 9l5-5M9 15l-5 5M15 15l5 5', clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 3',
   bold: 'M7 4.5h6a3.75 3.75 0 0 1 0 7.5H7zM7 12h7a3.75 3.75 0 0 1 0 7.5H7z', italic: 'M10 4.5h8M6 19.5h8M14 4.5l-4 15', underline: 'M7 4v7a5 5 0 0 0 10 0V4M5 20.5h14', strike: 'M4 12h16M16.5 7A4.5 4.5 0 0 0 12 4.5c-2.6 0-4.3 1.4-4.3 3.3 0 1.1.6 2 1.8 2.7M7.5 17A4.8 4.8 0 0 0 12 19.5c2.7 0 4.6-1.4 4.6-3.5 0-.7-.2-1.3-.6-1.8', sup: 'M4 8l7 11M11 8l-7 11M15 4.6c.4-.9 1.2-1.6 2.3-1.6 1.2 0 2.1.8 2.1 1.9 0 1.8-4.4 2.4-4.4 4.6h4.6', sub: 'M4 5l7 11M11 5l-7 11M15 14.6c.4-.9 1.2-1.6 2.3-1.6 1.2 0 2.1.8 2.1 1.9 0 1.8-4.4 2.4-4.4 4.6h4.6', fcolor: 'M6.5 15.5L12 3.5l5.5 12M8.6 11h6.8', hlpen: 'M15 4l5 5-8.5 8.5H6.5v-5zM12.5 6.5l5 5M4 21h8', clearfmt: 'M6 4.5h12M12.5 4.5L9 15M14 15l6 6M20 15l-6 6M4 19h6', alignjust: 'M4 6h16M4 10h16M4 14h16M4 18h16', listbul: 'M9.5 6H20M9.5 12H20M9.5 18H20M4.5 6h.5M4.5 12h.5M4.5 18h.5', listnum: 'M10 6h10M10 12h10M10 18h10M4 4.5h1.4V9M3.8 9h3M4 14.2a1.4 1.4 0 0 1 2.7.5c0 1.2-2.8 1.6-2.8 3.3h2.9', indent: 'M4 5h16M11 10h9M11 14h9M4 19h16M4 9.5l3.5 2.5L4 14.5', outdent: 'M4 5h16M11 10h9M11 14h9M4 19h16M7.5 9.5L4 12l3.5 2.5', linesp: 'M11 6h9M11 12h9M11 18h9M5.5 4v16M3 6.5l2.5-2.5L8 6.5M3 17.5L5.5 20 8 17.5', table: 'M3.5 5h17v14h-17zM3.5 10h17M3.5 15h17M9.2 5v14M14.8 5v14', pbreak: 'M6 3v5h12V3M6 21v-5h12v5M3 12h2.5M8 12h3M13 12h3M18.5 12H21', pagesetup: 'M6 3h9l4 4v14H6zM15 3v4h4M9 11h6M9 15h6', pilcrow: 'M13 4v16M17 4v16M19 4H9.5a4.5 4.5 0 0 0 0 9H13', toc: 'M4 6h16M7 10h13M10 14h10M7 18h13', hf: 'M5 3h14v18H5zM5 7h14M5 17h14', omega: 'M5 19h4.5v-2.2A6.5 6.5 0 1 1 14.5 16.8V19H19',
+  menu: 'M4 6h16M4 12h16M4 18h16', chevr: 'M9 6l6 6-6 6', sort: 'M4 6h10M4 12h7M4 18h4M17 5v14m0 0l-3-3m3 3l3-3',
 };
 const HINTS = {
   select: 'Click any text to change it · click something you added to move or resize it · drag on empty space to select several',
@@ -154,6 +265,7 @@ const HINTS = {
   text: 'Click anywhere to add text · change font, size and colour in the bar above while typing',
   note: 'Click to place a sticky note',
   pen: 'Draw freehand', marker: 'Drag over content to highlight freehand', hl: 'Drag a box to highlight an area',
+  uline: 'Drag over lines of text to underline them', sline: 'Drag over lines of text to strike them through',
   rect: 'Drag to draw a rectangle (Shift = square)', ellipse: 'Drag to draw an ellipse (Shift = circle)',
   line: 'Drag to draw a line (Shift = 45° steps)', arrow: 'Drag to draw an arrow (Shift = 45° steps)',
   link: 'Drag a box over the words or picture that should become a link — to a website or to another page',
@@ -339,6 +451,7 @@ async function openFiles(files, append, opt = {}) {
   files = [...files].filter(f => isPdf(f) || isDocx(f) || f.type.startsWith('image/'));
   if (!files.length) return toast('Please choose PDF, Word (.docx) or image files', true);
   if (!append && S.dirty && S.pages.length && !confirm('Discard unsaved changes and open a new document?')) return;
+  document.body.classList.remove('athome');
   await busy(async () => {
     if (append) pushUndo(); else resetDoc();
     let first = !append;
@@ -361,7 +474,7 @@ async function openFiles(files, append, opt = {}) {
 }
 function newDoc() {
   if (S.dirty && S.pages.length && !confirm('Discard unsaved changes and start a new document?')) return;
-  resetDoc(); S.fileName = 'untitled.pdf';
+  document.body.classList.remove('athome'); resetDoc(); S.fileName = 'untitled.pdf';
   S.pages.push({ id: uid(), src: -1, w: A4[0], h: A4[1], rot: 0, objs: [] });
   buildPages(); S.zoom = clamp(fitZoom(), 0.25, 1.25); layout(); setTool('select'); syncControls(); updateUI();
 }
@@ -596,6 +709,8 @@ const NEW = {
   pen: (P, st) => ({ type: 'path', pts: [P], color: st.color, width: st.width, opacity: st.opacity }),
   marker: P => ({ type: 'path', pts: [P], color: '#facc15', width: 14, opacity: 0.4, blend: true }),
   hl: P => cover(P, '#facc15', { opacity: 0.4, blend: true }),
+  uline: P => ({ type: 'rect', x: P[0], y: P[1], w: 0, h: 0, color: '#2563eb', fill: 'none', width: 1, dash: 'dash', opacity: 1, markup: 'u' }),
+  sline: P => ({ type: 'rect', x: P[0], y: P[1], w: 0, h: 0, color: '#dc2626', fill: 'none', width: 1, dash: 'dash', opacity: 1, markup: 's' }),
   link: P => ({ type: 'link', x: P[0], y: P[1], w: 0, h: 0, url: '', opacity: 1 }),
   crop: P => ({ type: 'rect', x: P[0], y: P[1], w: 0, h: 0, color: '#6d5efc', fill: 'none', width: 1, dash: 'dash', opacity: 1, crop: true }),
   whiteout: P => cover(P, '#ffffff', { cover: true }), redact: P => cover(P, '#000000', { cover: true, redact: true }),
@@ -603,7 +718,13 @@ const NEW = {
   line: (P, st) => ({ type: 'line', x1: P[0], y1: P[1], x2: P[0], y2: P[1], color: st.color, width: st.width, dash: st.dash, opacity: st.opacity }),
   arrow: (P, st) => ({ type: 'arrow', x1: P[0], y1: P[1], x2: P[0], y2: P[1], color: st.color, width: st.width, dash: st.dash, opacity: st.opacity }),
 };
-const STICKY = new Set(['pen', 'marker', 'hl', 'whiteout', 'redact']);
+const STICKY = new Set(['pen', 'marker', 'hl', 'whiteout', 'redact', 'uline', 'sline']);
+async function markupText(p, r, kind) { // underline / strike through every line of text the box touches, exactly along the words
+  const L = (await visibleText(p)).filter(l => l.w > 1 && !(l.rot % 360) && hitsRect({ x: l.x, y: l.y, w: l.w, h: l.h }, r)); if (!L.length) { S.undo.pop(); return toast('No text there — drag over the words'); }
+  for (const l of L) { const x1 = Math.max(l.x, Math.min(r.x, l.x + l.w)), x2 = L.length === 1 ? Math.min(l.x + l.w, Math.max(r.x + r.w, x1 + 4)) : l.x + l.w, a = L.length === 1 && r.w > 6 ? x1 : l.x, y = kind === 'u' ? l.base + 0.12 * l.size : l.base - 0.3 * l.size;
+    p.objs.push({ id: uid(), type: 'line', x1: a, y1: y, x2: L.length === 1 && r.w > 6 ? x2 : l.x + l.w, y2: y, color: kind === 'u' ? '#2563eb' : '#dc2626', width: Math.max(0.8, l.size / 14), dash: 'solid', opacity: 1, markup: kind, qt: l.base - 0.85 * l.size, qb: l.base + 0.25 * l.size }); }
+  drawObjs(p); updateUI(); scheduleSave();
+}
 let drag = null;
 function onDown(e, pid) {
   hideCtx();
@@ -710,6 +831,7 @@ function onUp() {
     const b = bbox(d.o), tiny = d.o.type === 'path' ? false : Math.max(b.w, b.h) < 3;
     if (tiny) { d.p.objs.pop(); S.undo.pop(); drawObjs(d.p); updateUI(); return; }
     if (d.o.crop) { d.p.objs.pop(); S.undo.pop(); drawObjs(d.p); return window.XD3.cropDlg(d.p, b); }
+    if (d.o.markup) { d.p.objs.pop(); drawObjs(d.p); return markupText(d.p, b, d.o.markup); }
     if (d.o.type === 'link') { setTool('select'); select(d.p.id, d.o.id); return window.XD3.linkDlg(d.p, d.o, true); }
     if (!STICKY.has(S.tool)) { setTool('select'); select(d.p.id, d.o.id); }
   } else if (d.moved) syncControls();
@@ -1327,7 +1449,7 @@ window.addEventListener('keydown', e => { // arrow keys / Enter / Esc inside an 
 
 const STAMPS = [['APPROVED', '#16a34a'], ['REJECTED', '#dc2626'], ['CONFIDENTIAL', '#dc2626'], ['DRAFT', '#64748b'], ['PAID', '#2563eb'], ['COPY', '#64748b'], ['SIGN HERE', '#d97706']];
 const TOOL_LIST = [['select', 'Select', 'cursor', 'V'], ['hand', 'Pan', 'hand'], '-', ['edittext', 'Edit text', 'edittext', 'E'], ['text', 'Add text', 'text', 'T'], ['editobj', 'Move content', 'editobj', 'B'], ['whiteout', 'Whiteout', 'eraser', 'W'], '-',
-  ['marker', 'Highlight pen', 'marker', 'M'], ['hl', 'Highlight box', 'hl', 'H'], ['pen', 'Pen', 'pen', 'P'], ['note', 'Sticky note', 'note', 'N'], '-',
+  ['marker', 'Highlight pen', 'marker', 'M'], ['hl', 'Highlight box', 'hl', 'H'], ['uline', 'Underline text', 'underline', 'U'], ['sline', 'Strike through text', 'strike', 'K'], ['pen', 'Pen', 'pen', 'P'], ['note', 'Sticky note', 'note', 'N'], '-',
   ['rect', 'Rectangle', 'rect', 'R'], ['ellipse', 'Ellipse', 'ellipse', 'O'], ['line', 'Line', 'line', 'L'], ['arrow', 'Arrow', 'arrow', 'A'], '-',
   ['link', 'Link', 'link'], ['crop', 'Crop', 'crop'], ['redact', 'Black out', 'redact']];
 const toolsSub = () => TOOL_LIST.map(x => x === '-' ? '-' : mi(x[1], x[2], 'tool', { d: { t: x[0] }, key: x[3], checked: S.tool === x[0] }));
@@ -1396,7 +1518,7 @@ const appMenu = () => S.pages.length ? [
 ];
 async function onContext(e, pid) { // right-click on a page: the document's text, the object under the pointer, or the page itself
   commitEdit();
-  const ti = S.tool === 'edittext' && e.target.closest('[data-ti]'), textMenu = () => showCtx(e, [mi('Edit this text', 'edittext', 'ti_edit'), mi('Copy this text', 'copy', 'ti_copy'), '-', mi('Highlight this text', 'hl', 'ti_mark', { d: { k: 'hl' } }), mi('Black out this text', 'redact', 'ti_mark', { d: { k: 'redact' } }), mi('Cover with white', 'eraser', 'ti_mark', { d: { k: 'whiteout' } }), '-', mi('Delete this text', 'trash', 'ti_del', { danger: 1 })]);
+  const ti = S.tool === 'edittext' && e.target.closest('[data-ti]'), textMenu = () => showCtx(e, [mi('Edit this text', 'edittext', 'ti_edit'), mi('Copy this text', 'copy', 'ti_copy'), '-', mi('Highlight this text', 'hl', 'ti_mark', { d: { k: 'hl' } }), mi('Underline this text', 'underline', 'ti_mark', { d: { k: 'u' } }), mi('Strike through this text', 'strike', 'ti_mark', { d: { k: 's' } }), mi('Black out this text', 'redact', 'ti_mark', { d: { k: 'redact' } }), mi('Cover with white', 'eraser', 'ti_mark', { d: { k: 'whiteout' } }), '-', mi('Delete this text', 'trash', 'ti_del', { danger: 1 })]);
   if (ti) { S.ctxTI = { pid, i: +ti.dataset.ti }; return textMenu(); }
   const p = pageById(pid), oe = e.target.closest('[data-id]'), hit = oe && p.objs.find(x => x.id === oe.dataset.id);
   if (!hit && S.tool === 'select') { const i = await textItemAt(p, toPt(e, PE.get(pid))); if (i >= 0) { S.ctxTI = { pid, i }; return textMenu(); } }
@@ -1445,11 +1567,37 @@ function edPaste() { // paste into the focused text field / text box
   if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(t => { if (t) document.execCommand('insertText', false, t); }).catch(fail); else fail();
 }
 function setTab(t) { $$('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t)); $$('.pane').forEach(p => p.classList.toggle('active', p.dataset.pane === t)); }
-$('#tabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if (b) setTab(b.dataset.tab); });
+if ($('#tabs')) $('#tabs').addEventListener('click', e => { const b = e.target.closest('.tab'); if (b) setTab(b.dataset.tab); }); // (the tool row has no tabs now)
+// The font menu: a search box, the fonts used lately, then every family by group. Each name is shown in its own face as it scrolls into view
+// (only the regular file is loaded for that, so opening the menu stays light even with 150 fonts).
+const recentFonts = () => { try { return JSON.parse(localStorage.getItem('xd3.recentfonts') || '[]').filter(n => FONTS[n] || S.xfonts[n]); } catch (e) { return []; } };
+function noteFont(n) { try { localStorage.setItem('xd3.recentfonts', JSON.stringify([n, ...recentFonts().filter(x => x !== n)].slice(0, 6))); } catch (e) { /* not remembered */ } }
+const previewed = new Set();
+function previewFont(n) {
+  const B = BUNDLED[n]; if (!B || previewed.has(n) || fontReq[n]) return; previewed.add(n);
+  const ff = new FontFace('XD3P ' + n, `url(lib/fonts/${B[0]}-Regular.ttf)`); document.fonts.add(ff); ff.load().catch(() => { /* the fallback face shows */ });
+}
+let fontIO = null;
 function buildFontMenu() {
-  const doc = Object.keys(S.xfonts), groups = { ...(doc.length ? { 'From this document': doc } : {}), Standard: ['Helvetica', 'Times', 'Courier'] }; for (const n in BUNDLED) (groups[BUNDLED[n][3]] = groups[BUNDLED[n][3]] || []).push(n);
+  const doc = Object.keys(S.xfonts), rec = recentFonts(), groups = { ...(doc.length ? { 'From this document': doc } : {}), ...(rec.length ? { 'Recently used': rec } : {}), Standard: ['Helvetica', 'Times', 'Courier'] };
+  for (const n in BUNDLED) (groups[BUNDLED[n][3]] = groups[BUNDLED[n][3]] || []).push(n);
   doc.forEach(useXFont);
-  $('#mFonts').innerHTML = Object.entries(groups).map(([g, list]) => `<div class="mhead">${g}</div>` + list.map(n => `<button data-act="setfont" data-f="${n}" data-keep style='font-family:${FONTS[n]}'>${esc(fontLabel(n))}</button>`).join('')).join('');
+  const face = n => BUNDLED[n] ? `"XD3P ${n}", ${FONTS[n]}` : FONTS[n] || '';
+  const m = $('#mFonts'), q = (m.querySelector('#fontQ') || {}).value || '';
+  m.innerHTML = `<div class="fsearch"><i data-icon="search"></i><input id="fontQ" type="search" placeholder="Search ${Object.keys(BUNDLED).length + 3} fonts…" autocomplete="off" spellcheck="false" value="${esc(q)}"></div><div class="flist">`
+    + Object.entries(groups).map(([g, list]) => `<div class="mhead" data-g="${esc(g)}">${esc(g)}</div>` + list.map(n => `<button data-act="setfont" data-f="${esc(n)}" data-keep data-n="${esc(fontLabel(n).toLowerCase())}" style='font-family:${face(n)}'>${esc(fontLabel(n))}${BUNDLED[n] && BUNDLED[n][3] === 'Popular' ? '<small>same width as the Office font</small>' : ''}</button>`).join('')).join('') + '<div class="fnone mut" hidden>No font with that name</div></div>';
+  icons(m);
+  const inp = $('#fontQ', m), filter = () => {
+    const v = inp.value.trim().toLowerCase(); let any = false;
+    m.querySelectorAll('.flist > button').forEach(b => { const on = !v || b.dataset.n.includes(v); b.hidden = !on; any = any || on; });
+    m.querySelectorAll('.flist > .mhead').forEach(h => { let n = h.nextElementSibling, on = false; while (n && n.tagName === 'BUTTON') { if (!n.hidden) on = true; n = n.nextElementSibling; } h.hidden = !on; });
+    m.querySelector('.fnone').hidden = any;
+  };
+  inp.addEventListener('input', filter); inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') { const b = [...m.querySelectorAll('.flist > button')].find(x => !x.hidden); if (b) b.click(); } if (e.key === 'Escape') m.classList.remove('open'); });
+  inp.addEventListener('click', e => e.stopPropagation()); if (q) filter();
+  if (fontIO) fontIO.disconnect();
+  fontIO = 'IntersectionObserver' in window ? new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) previewFont(en.target.dataset.f); }), { root: m.querySelector('.flist') }) : null;
+  m.querySelectorAll('.flist > button').forEach(b => fontIO ? fontIO.observe(b) : previewFont(b.dataset.f));
 }
 function newTextAt(note) { // from the right-click menu: add text / a note where the user clicked (or mid-view)
   const p = S.ctxPt ? pageById(S.ctxPt.pid) : S.pages[S.cur]; if (!p) return;
@@ -1782,6 +1930,7 @@ async function buildPdf(pages, opt = {}) { // opt.redact: 'flatten' (default —
     if (o.type === 'rect' && o.blend) { // highlight area
       Object.assign(d, { Subtype: 'Highlight', C: col(o.fill), QuadPoints: [...upt(M, b.x, b.y), ...upt(M, b.x + b.w, b.y), ...upt(M, b.x, b.y + b.h), ...upt(M, b.x + b.w, b.y + b.h)] }); delete d.IC;
     } else if (o.type === 'rect') d.Subtype = 'Square'; else if (o.type === 'ellipse') d.Subtype = 'Circle';
+    else if (isLine(o) && o.markup && o.qt != null) { const x1 = Math.min(o.x1, o.x2), x2 = Math.max(o.x1, o.x2); Object.assign(d, { Subtype: o.markup === 'u' ? 'Underline' : 'StrikeOut', QuadPoints: [...upt(M, x1, o.qt), ...upt(M, x2, o.qt), ...upt(M, x1, o.qb), ...upt(M, x2, o.qb)] }); delete d.BS; }
     else if (isLine(o)) { Object.assign(d, { Subtype: 'Line', L: [...upt(inv, o.x1, o.y1), ...upt(inv, o.x2, o.y2)] }); if (o.type === 'arrow') { d.LE = ['None', 'ClosedArrow']; d.IC = col(o.color); } }
     else if (o.type === 'path') { Object.assign(d, { Subtype: 'Ink', InkList: [o.pts.flatMap(q => upt(inv, q[0], q[1]))] }); if (o.blend) d.Contents = L.PDFHexString.fromText('Highlight'); }
     page.node.addAnnot(ctx.register(ctx.obj(d)));
@@ -1940,7 +2089,7 @@ const ACT = {
   rotall: () => pageOp(() => S.pages.forEach(p => p.rot = (p.rot + 90) % 360)), delpage: () => deletePage(S.cur),
   fwd: () => stepOrder(1), bwd: () => stepOrder(-1), orot: b => rotateSel(+b.dataset.v), opac: b => quickProp('opacity', +b.dataset.v), sdash: b => quickProp('dash', b.dataset.v),
   tstyle: b => { const o = textTarget(); if (o) quickProp(b.dataset.k, !o[b.dataset.k]); }, talign: b => quickProp('align', b.dataset.v),
-  tsize: b => { const o = textTarget(); if (o) quickProp('size', clamp(Math.round(o.size) + +b.dataset.v, 4, 300)); }, setfont: b => { ensureFont(b.dataset.f); quickProp('font', b.dataset.f); },
+  tsize: b => { const o = textTarget(); if (o) quickProp('size', clamp(Math.round(o.size) + +b.dataset.v, 4, 300)); }, setfont: b => { ensureFont(b.dataset.f); noteFont(b.dataset.f); quickProp('font', b.dataset.f); },
   toallpages: toAllPages, imgreplace: imgReplace, imgsave: imgSave,
   ed_cut: () => document.execCommand('cut'), ed_copy: () => document.execCommand('copy'), ed_paste: edPaste, ed_selall: () => document.execCommand('selectAll'), ed_done: () => commitEdit(),
   ti_edit: () => { const c = S.ctxTI, p = c && pageById(c.pid); if (p) convertTextItem(p, c.i); },
@@ -1969,7 +2118,8 @@ const ACT = {
   stamphere: b => { S.placeAt = S.ctxPt && { ...S.ctxPt, t: Date.now() }; ACT.stamp(b); },
   ti_mark: async b => { // highlight / black out / white out exactly the line that was right-clicked
     const c = S.ctxTI, p = c && pageById(c.pid), it = await ctxItem(); if (!it) return; const r = aabb(it), k = b.dataset.k;
-    pushUndo(); const o = { id: uid(), ...NEW[k]([r.x - 1, r.y], S.style), w: r.w + 2, h: r.h }; p.objs.push(o); drawObjs(p); if (S.tool === 'edittext') drawTI(p);
+    pushUndo(); if (k === 'u' || k === 's') { await markupText(p, { x: r.x, y: r.y, w: r.w, h: r.h }, k); if (S.tool === 'edittext') drawTI(p); return toast(k === 'u' ? 'Underlined' : 'Struck through'); }
+    const o = { id: uid(), ...NEW[k]([r.x - 1, r.y], S.style), w: r.w + 2, h: r.h }; p.objs.push(o); drawObjs(p); if (S.tool === 'edittext') drawTI(p);
     toast(k === 'hl' ? 'Highlighted' : k === 'redact' ? 'Blacked out — removed for good when you save' : 'Covered with white');
   },
   pgup: () => { if (S.cur > 0) { movePage(S.cur, S.cur - 1); goToPage(S.cur - 1); } }, pgdown: () => { if (S.cur < S.pages.length - 1) { movePage(S.cur, S.cur + 1); goToPage(S.cur + 1); } }, moveto: () => movePageDlg(),
@@ -1995,7 +2145,7 @@ document.addEventListener('click', e => {
   hideCtx(); $$('.menu.open').forEach(m => { if (!mb || m.id !== mb.dataset.menu) m.classList.remove('open'); });
   if (mb) {
     const m = $('#' + mb.dataset.menu); m.classList.toggle('open');
-    if (m.id === 'mFonts') { buildFontMenu(); Object.keys(BUNDLED).forEach(ensureFont); } // fonts found in the document are listed too, and every name previews in its own face
+    if (m.id === 'mFonts') { const fq = $('#fontQ'); if (fq) fq.value = ''; buildFontMenu(); setTimeout(() => { const i = $('#fontQ'); if (i && m.classList.contains('open')) i.focus(); }, 30); } // fonts found in the document are listed too, and every name previews in its own face
     if (m.classList.contains('fx')) { const r = mb.getBoundingClientRect(); placeMenu(m, r.left, r.bottom + 6); }
     return;
   }
@@ -2049,7 +2199,7 @@ viewer.addEventListener('touchstart', e => { if (e.touches.length === 2) pinch =
 viewer.addEventListener('touchmove', e => { if (pinch && e.touches.length === 2) { e.preventDefault(); setZoom(pinch.z * tdist(e.touches) / pinch.d); } }, { passive: false });
 viewer.addEventListener('touchend', e => { if (e.touches.length < 2) pinch = null; });
 
-const TOOL_KEYS = { v: 'select', t: 'text', e: 'edittext', b: 'editobj', n: 'note', p: 'pen', m: 'marker', h: 'hl', r: 'rect', o: 'ellipse', l: 'line', a: 'arrow', w: 'whiteout' };
+const TOOL_KEYS = { v: 'select', t: 'text', e: 'edittext', b: 'editobj', n: 'note', p: 'pen', m: 'marker', h: 'hl', u: 'uline', k: 'sline', r: 'rect', o: 'ellipse', l: 'line', a: 'arrow', w: 'whiteout' };
 window.addEventListener('keydown', e => {
   if (dlg.open || document.body.classList.contains('modal')) return;
   const typing = /INPUT|TEXTAREA|SELECT/.test(e.target.tagName) || e.target.isContentEditable, k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
@@ -2084,7 +2234,10 @@ window.addEventListener('keydown', e => {
 window.addEventListener('beforeunload', e => { if (S.dirty && S.pages.length) { e.preventDefault(); e.returnValue = ''; } });
 window.addEventListener('resize', () => { hideCtx(); drawSel(); });
 
-try { const t = localStorage.getItem('xd3.theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) { /* ignore */ }
+{ // light or dark: the user's own choice; light until they pick dark (the theme button or ⋯ → Appearance)
+  let t = null; try { t = localStorage.getItem('xd3.theme'); } catch (e) { /* ignore */ }
+  document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light';
+}
 DB.get('session').then(s => { if (s && s.pages && s.pages.length) { const b = $('#bRestore'); b.hidden = false; b.title = s.fileName || ''; } }).catch(() => {});
 $('#yr').textContent = new Date().getFullYear();
 $('#hint').textContent = HINTS.select;
@@ -2098,5 +2251,5 @@ window.XD3 = { S, PE, ACT, NO_DOC, HINTS, A4, CSS_UNITS, LH, BASE, viewer, $, $$
   pushUndo, snap, resetDoc, scheduleSave, buildPages, layout, drawObjs, drawSel, select, selObjs, selOne, setTool, syncControls, updateUI, goToPage, fitZoom, setZoom,
   bbox, center, rotP, shiftObj, isLine, textLines, measure, baseOff, cssFont, rdims, baseName, parseRange, textObj, placeObj, insertImage, addAsset, readImage, imagePage,
   visible, getPdfPage, addSource, loadSource, openFiles, isPdf, isDocx, getText, getLines, getBlocks, toBlocks, getImages, scanPage, visibleText, covered, fontStyle, origFont, fontLabel, baseCanvas, baseSig, isBaseImg, aabb, hitsRect, hex, editOriginal, coverFor, convertRegion, renderPageImage, buildPdf, pageOp, movePage,
-  rotatePage, dupPage, deletePage, movePageDlg, traceOn, runFind, loadLib, isRedact, startEdit, r2, DB, convertTextItem, drawTI, showCtx, mi, pageSub, ensureFont, BUNDLED, FONTS, commitEdit, viewCenter, updateBell, flash };
+  rotatePage, dupPage, deletePage, movePageDlg, _markupText: markupText, hideCtx, traceOn, runFind, loadLib, isRedact, startEdit, r2, DB, convertTextItem, drawTI, showCtx, mi, pageSub, ensureFont, BUNDLED, FONTS, commitEdit, viewCenter, updateBell, flash };
 })();

@@ -7,3 +7,6 @@ Thumbs.db
 desktop.ini
 downloads/
 tests/out/
+
+# the offline AI model (483 MB, over GitHub's 100 MB file limit): kept in this folder for the EXE and the website ZIP, not in git
+lib/ai/models/

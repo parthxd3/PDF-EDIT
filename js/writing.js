@@ -16,6 +16,7 @@ const W = {
 /* ───────── workspace ───────── */
 const box = document.createElement('section'); box.id = 'writer'; box.hidden = true;
 box.innerHTML = `<header>
+    <button class="btn dx-home" data-w="home" title="Home — the start screen"><i data-icon="home"></i><span>Home</span></button>
     <b><i data-icon="spell"></i>Writing tools</b><span id="wrName" class="mut"></span>
     <div class="spacer"></div>
     <button class="btn line" data-w="open" title="Open a Word (.docx) or text (.txt) file"><i data-icon="folder"></i><span>Open</span></button>
@@ -283,14 +284,53 @@ function rewrites(tone, paras = W.paras) { // → [{ i, a, b, from, to, why }] f
   });
   return out.sort((x, y) => x.i - y.i || x.a - y.a);
 }
+/* the offline AI: whole text paragraph by paragraph, or the paragraph with the cursor */
+W.aiScope = 'doc';
+function caretPara() { const s = getSelection(); if (!s.rangeCount) return -1; let n = s.getRangeAt(0).startContainer; while (n && n.parentNode !== page) n = n.parentNode; return n ? [...page.children].indexOf(n) : -1; }
+async function wAiGo(task) {
+  if (!X.ai) return; if (W.ai && W.ai.running) return toast('The AI is still working — Stop it first', 'info');
+  const whole = task === 'summary' || task === 'bullets' || task === 'continue', ci = caretPara();
+  let segs = W.aiScope === 'para' && ci >= 0 ? [{ i: ci, from: W.paras[ci].text }] : whole ? [{ i: W.paras.length - 1, from: W.paras.map(p => p.text).join('\n').trim(), whole: true }] : W.paras.map((p, i) => ({ i, from: p.text })).filter(x => (x.from.match(/[\p{L}\p{N}]+/gu) || []).length >= 4);
+  segs = segs.filter(x => x.from.trim()); if (!segs.length) return toast(W.paras.length ? 'Nothing long enough to rewrite here' : 'Paste or open some text first', 'info');
+  W.ai = { task, segs, i: 0, running: true }; renderHuman();
+  try { for (let k = 0; k < segs.length && W.ai.running; k++) { const x = segs[k]; W.ai.i = k; x.to = ''; x.live = true; wAiDraw(); const r = await X.ai.run(task, x.from, { onToken: t => { x.to += t; wAiDraw(true); } }); Object.assign(x, { to: r.text, refused: r.refused, live: false, done: true }); wAiDraw(); } }
+  catch (e) { toast(e.message, true); } finally { W.ai.running = false; wAiDraw(); }
+}
+async function wAiApply(list, all) {
+  const task = W.ai.task, ins = task === 'summary' || task === 'bullets'; if (!list.length) return; remember(); let n = 0;
+  for (const x of [...list].sort((a, b) => b.i - a.i)) { if (!x.done || x.refused || x.applied) continue;
+    if (ins) { const lines = x.to.split('\n').filter(Boolean).map(text => ({ text, orig: text, issues: [] })); W.paras.splice(x.i + 1, 0, ...lines); }
+    else if (task === 'continue') W.paras[x.i].text = W.paras[x.i].text.replace(/\s*$/, ' ') + x.to.trim();
+    else { if (W.paras[x.i].text !== x.from && !x.whole) { x.refused = 'the text has changed since'; continue; } W.paras[x.i].text = x.to; }
+    x.applied = true; n++; }
+  for (const p of W.paras) if (ins) await lintPara(p).catch(() => {}); if (!ins) for (const x of list) if (x.applied && W.paras[x.i]) await lintPara(W.paras[x.i]).catch(() => {});
+  renderDoc(); renderSide(); if (n) toast(`${n} change${n > 1 ? 's' : ''} made — Ctrl+Z to undo`, 'success');
+}
+function wAiDraw(live) {
+  const host = $('#wrAiOut'); if (!host || !W.ai) return; const { segs, running, task } = W.ai, T = X.ai.TASKS[task], ins = task === 'summary' || task === 'bullets' || task === 'continue';
+  if (live) { const x = segs[W.ai.i], c = host.querySelector(`[data-wk="${W.ai.i}"] .aia`); if (c && x) { c.textContent = x.to; return; } }
+  const open = segs.filter(x => x.done && !x.refused && !x.applied).length;
+  host.innerHTML = `<div class="aibar"><b>${esc(T.label)}</b><span class="mut">${running ? (segs.length > 1 ? `paragraph ${W.ai.i + 1} of ${segs.length}…` : 'writing…') : ''}</span>${running ? '<button class="btn line sm" data-wai="stop">Stop</button>' : open > 1 ? `<button class="btn primary sm" data-wai="all">Accept all ${open}</button>` : ''}</div>${X.ai.statusHtml()}
+    <div class="wcards">${segs.map((x, k) => x.done || x.live ? `<div class="wcard airesult${x.applied ? ' done' : ''}" data-wk="${k}">${ins ? '' : `<div class="aiq">${esc(x.from.length > 220 ? x.from.slice(0, 220) + '…' : x.from)}</div>`}<div class="aia">${esc(x.to || '') || '<span class="mut">Thinking…</span>'}</div>
+      ${x.refused && x.done ? `<div class="wcm">${x.refused === 'no change' ? 'The AI found nothing to change.' : 'This answer was not used (' + esc(x.refused) + ') — try again.'}</div>` : ''}
+      ${x.done ? `<div class="wps">${x.applied ? '<span class="mut">✓ Applied</span>' : x.refused ? '' : `<button data-wai="acc" data-x="${k}">${ins ? (task === 'continue' ? 'Add to the text' : 'Insert below') : 'Replace'}</button>`}${x.to ? `<button data-wai="copy" data-x="${k}">Copy</button>` : ''}</div>` : ''}</div>` : '').join('')}</div>`;
+}
+document.addEventListener('xd3:ai', () => { if (W.open && W.tab === 'human') wAiDraw(); });
 function renderHuman() {
   W.rewrites = rewrites(W.tone);
-  pane.innerHTML = `<p class="mut">Suggestions to make the writing sound more natural and personal: plainer words, fewer stock phrases, contractions${W.tone === 'formal' ? ' — or, in Formal, the opposite' : ''}. Nothing changes until you accept it.</p>
+  pane.innerHTML = `${X.ai ? `<section class="aibox"><div class="aihd"><i data-icon="sparkle"></i><div><b>AI writing assistant</b><small>Runs offline on this device — nothing is uploaded</small></div></div>
+      <label class="aiscope">Work on <select id="wrAiScope"><option value="doc"${W.aiScope === 'doc' ? ' selected' : ''}>the whole text</option><option value="para"${W.aiScope === 'para' ? ' selected' : ''}>the paragraph with the cursor</option></select></label>
+      <div class="aigrid">${Object.entries(X.ai.TASKS).map(([k, t]) => `<button data-wai="go" data-t="${k}" title="${esc(t.hint)}"><i data-icon="${t.icon}"></i><span>${esc(t.label)}</span></button>`).join('')}</div><div id="wrAiOut"></div></section>
+    <h4 class="wh">Quick fixes <small>instant, no AI</small></h4>` : ''}<p class="mut">Plainer words, fewer stock phrases, contractions${W.tone === 'formal' ? ' — or, in Formal, the opposite' : ''}. Nothing changes until you accept it.</p>
     <div class="wtone">${[['natural', 'Natural'], ['casual', 'Casual'], ['formal', 'Formal']].map(([v, l]) => `<button data-tone="${v}" class="${W.tone === v ? 'on' : ''}">${l}</button>`).join('')}</div>
     ${W.rewrites.length ? `<button class="btn primary wfull" data-w="acceptall">Accept all ${W.rewrites.length} change(s)</button>` : ''}
     <div class="wcards">${W.rewrites.length ? W.rewrites.slice(0, 400).map((r, k) => `<div class="wcard wrw" data-k="${k}"><div class="wcw"><s>${esc(r.from)}</s> → <b>${r.to ? esc(r.to) : '<i>remove</i>'}</b></div><div class="wcm">${esc(r.why)}</div><div class="wps"><button data-acc="${k}">Accept</button><button data-skip="${k}">Skip</button></div></div>`).join('') : '<div class="empty">Nothing to change in this tone.</div>'}</div>`;
+  icons(pane); const sc = $('#wrAiScope'); if (sc) sc.onchange = e => { W.aiScope = e.target.value; }; wAiDraw();
 }
 pane.addEventListener('click', async e => {
+  const wa = e.target.closest('[data-wai]'); if (wa) { const v = wa.dataset.wai, x = W.ai && W.ai.segs[+wa.dataset.x];
+    if (v === 'go') return wAiGo(wa.dataset.t); if (v === 'stop') { X.ai.stop(); W.ai.running = false; return; } if (v === 'all') return wAiApply(W.ai.segs); if (v === 'acc' && x) return wAiApply([x]);
+    if (v === 'copy' && x) navigator.clipboard.writeText(x.to).then(() => toast('Copied'), () => toast('Copy is not available here', true)); return; }
   const tb = e.target.closest('[data-tone]'); if (tb) { W.tone = tb.dataset.tone; return renderHuman(); }
   const acc = e.target.closest('[data-acc]'), skip = e.target.closest('[data-skip]');
   if (acc) { const r = W.rewrites[+acc.dataset.acc]; if (r && W.paras[r.i].text.slice(r.a, r.b) === r.from) await applyAt(r.i, r.a, r.b, r.to); else renderHuman(); }
@@ -460,7 +500,7 @@ const ACTS = {
   open: async () => { const f = await pick('.docx,.txt,.md,.csv,text/plain'); if (f && /\.docx$/i.test(f.name) && X.docx) { close(); return X.docx.openFile(f); } return openFile(f); }, // (Word files open in the Word editor, which has these tools too)
   paste: async () => { let t = ''; try { t = await navigator.clipboard.readText(); } catch (e) { /* no clipboard access */ } await openWith((t || '').replace(/\r\n?/g, '\n').split('\n').map(text => ({ text, orig: text, issues: [] })), 'text', 'text'); if (!t) { const el = page.querySelector('.wp'); if (el) el.focus(); toast('Type or paste your text', 'info'); } },
   pdf: async () => { if (!S.pages.length) return toast('Open a PDF first'); await busy(async () => openWith(await loadPdf(), 'pdf', X.baseName()), 'Reading the PDF…'); },
-  undo: undoW, redo: redoW, close,
+  undo: undoW, redo: redoW, close, home: () => X.ACT.home(),
   fixall: fixAct('all'), fixspell: fixAct('spell'), fixgram: fixAct('grammar'),
   acceptall: acceptAll,
   save: () => {

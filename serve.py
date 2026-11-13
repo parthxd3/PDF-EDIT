@@ -8,7 +8,16 @@ class Handler(SimpleHTTPRequestHandler):
     extensions_map = { **SimpleHTTPRequestHandler.extensions_map, '.js': 'text/javascript', '.webmanifest': 'application/manifest+json', '.gz': 'application/gzip', '.ttf': 'font/ttf', '.bcmap': 'application/octet-stream', '.pfb': 'application/octet-stream', '.wasm': 'application/wasm', '.mjs': 'text/javascript' }
     def end_headers(self):
         self.send_header('Cache-Control', 'no-cache')
+        # cross-origin isolation: lets the offline AI use several processor cores (everything the page loads is its own, so nothing breaks)
+        self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
+        self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
         super().end_headers()
+    def translate_path(self, path):  # downloads/ is served from dist/downloads, so "Download for Windows" also works on this local copy
+        import os
+        p = path.split('?')[0].split('#')[0]
+        if p.startswith('/downloads/') and not os.path.isdir('downloads'):
+            path = '/dist' + path
+        return super().translate_path(path)
     def log_message(self, fmt, *args):  # keep the window quiet
         pass
     def do_PUT(self):  # the self-test drops files it saved into tests/out/ (only there), so Word can check them
